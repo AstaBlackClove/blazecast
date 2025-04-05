@@ -19,12 +19,12 @@ export function SuggestionItem({ suggestion, selected, onClick }: Props) {
   return (
     <div
       className={`flex items-center cursor-pointer px-4 py-3 transition-colors duration-150 rounded-md m-2 ${
-        selected ? "bg-gray-500 rounded-md m-2" : "hover:bg-gray-800 "
+        selected ? "bg-gray-500 rounded-md m-2" : "hover:bg-gray-800"
       }`}
       onClick={onClick}
       ref={ref}
     >
-      {/* {suggestion.icon ? (
+      {suggestion.icon ? (
         <div className="w-5 h-5 mr-3 flex items-center justify-center">
           <img src={suggestion.icon} alt="" className="w-full h-full" />
         </div>
@@ -34,7 +34,7 @@ export function SuggestionItem({ suggestion, selected, onClick }: Props) {
             suggestion.iconColor || "bg-blue-500"
           }`}
         ></div>
-      )} */}
+      )}
       <div className="flex-1">
         <div className="font-normal text-white">{suggestion.title}</div>
         {suggestion.subtitle && (

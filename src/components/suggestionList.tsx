@@ -12,11 +12,35 @@ export function SuggestionList({
   selectedIndex,
   onSuggestionClick,
 }: Props) {
-  const today = suggestions.filter(
-    (s) => s.category === "Today" || !s.category
+  // Group suggestions by category
+  const groupedSuggestions = suggestions.reduce<Record<string, Suggestion[]>>(
+    (acc, suggestion) => {
+      const category = suggestion.category || "Other";
+      if (!acc[category]) {
+        acc[category] = [];
+      }
+      acc[category].push(suggestion);
+      return acc;
+    },
+    {}
   );
-  const other = suggestions.filter((s) => s.category && s.category !== "Today");
+
   const isEmpty = suggestions.length === 0;
+
+  // Function to get the actual index in the flat array
+  const getAbsoluteIndex = (
+    categoryIndex: number,
+    itemIndex: number
+  ): number => {
+    let absoluteIndex = 0;
+    const categories = Object.keys(groupedSuggestions);
+
+    for (let i = 0; i < categoryIndex; i++) {
+      absoluteIndex += groupedSuggestions[categories[i]].length;
+    }
+
+    return absoluteIndex + itemIndex;
+  };
 
   return (
     <div className="flex flex-col h-full">
@@ -30,34 +54,29 @@ export function SuggestionList({
           </div>
         ) : (
           <div>
-            {today.length > 0 && (
-              <div>
-                <div className="text-xs text-gray-500 px-4 py-2 uppercase tracking-wide">
-                  Today
-                </div>
-                {today.map((suggestion, index) => (
-                  <SuggestionItem
-                    key={suggestion.id}
-                    suggestion={suggestion}
-                    selected={selectedIndex === index}
-                    onClick={() => onSuggestionClick(suggestion)}
-                  />
-                ))}
-              </div>
-            )}
-            {other.length > 0 &&
-              other.map((category, categoryIndex) => (
-                <div key={categoryIndex}>
+            {Object.entries(groupedSuggestions).map(
+              ([category, items], categoryIndex) => (
+                <div key={category}>
                   <div className="text-xs text-gray-500 px-4 py-2 uppercase tracking-wide">
-                    {category.category}
+                    {category}
                   </div>
-                  <SuggestionItem
-                    suggestion={category}
-                    selected={selectedIndex === today.length + categoryIndex}
-                    onClick={() => onSuggestionClick(category)}
-                  />
+                  {items.map((suggestion, itemIndex) => {
+                    const absoluteIndex = getAbsoluteIndex(
+                      categoryIndex,
+                      itemIndex
+                    );
+                    return (
+                      <SuggestionItem
+                        key={suggestion.id}
+                        suggestion={suggestion}
+                        selected={selectedIndex === absoluteIndex}
+                        onClick={() => onSuggestionClick(suggestion)}
+                      />
+                    );
+                  })}
                 </div>
-              ))}
+              )
+            )}
           </div>
         )}
       </div>

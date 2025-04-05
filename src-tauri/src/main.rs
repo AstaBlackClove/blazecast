@@ -3,7 +3,7 @@
 use tauri::GlobalShortcutManager;
 use tauri::Manager;
 mod commands;
-use commands::fetch_app::{fetch_installed_apps, open_app};
+use commands::fetch_app::{search_apps, get_recent_apps, open_app, search_files};
 
 fn main() {
     let tray_menu = tauri::SystemTrayMenu::new()
@@ -27,7 +27,7 @@ fn main() {
             },
             _ => {}
         })
-        .invoke_handler(tauri::generate_handler![fetch_installed_apps, open_app])
+        .invoke_handler(tauri::generate_handler![search_apps, get_recent_apps, open_app, search_files])
         .setup(|app| {
             // Register global shortcut (Alt+Space by default)
             let app_handle = app.handle();

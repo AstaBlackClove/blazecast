@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 // import { ArrowLeft } from "lucide-react";
 
 type Props = {
@@ -34,8 +34,24 @@ export function CommandInput({
     }
   };
 
+  // Clear the input when the window is hidden
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        setInput("");
+        onQueryChange("");
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [onQueryChange]);
+
   return (
-    <div className="flex items-center  border-b border-gray-800 px-3 py-2">
+    <div className="flex items-center border-b border-gray-800 px-3 py-2">
       {/* <div className="text-gray-500 mr-2">
         <ArrowLeft size={16} />
       </div> */}
