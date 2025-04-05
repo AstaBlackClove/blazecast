@@ -5,29 +5,29 @@ description = "A Tauri App"
 authors = ["you"]
 edition = "2021"
 
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
 [build-dependencies]
 tauri-build = { version = "1", features = [] }
 
 [dependencies]
-tauri = { version = "1", features = [ 
-    "global-shortcut-all", "shell-open", "system-tray", 
-    "global-shortcut", "window-hide", "window-show", 
-    "window-close", "window-set-focus"
-]}
+tauri = { version = "1", features = [ "global-shortcut-all", "shell-open", "system-tray", "global-shortcut", "window-hide", "window-show", "window-close", "window-set-focus"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 walkdir = "2.3"
-windows-registry = "0.4.0"
-windows = { version = "0.51", features = [
+windows = { version = "0.48", features = [
     "Win32_Foundation",
+    "Win32_UI_WindowsAndMessaging",
     "Win32_UI_Shell",
     "Win32_System_Com",
     "Win32_Graphics_Gdi",
-    "Win32_UI_WindowsAndMessaging",
-]}
-image = "0.24.7"
-base64 = "0.21.0"
-lazy_static = "1.4.0"
+    "Win32_Graphics_Imaging",
+    "Win32_System_Com_StructuredStorage",
+    "implement"
+] }
+uuid = { version = "1.4", features = ["v4"] }
+base64 = "0.21"
 
 [features]
+# This feature is used for production builds or when a dev server is not specified, DO NOT REMOVE!!
 custom-protocol = ["tauri/custom-protocol"]
