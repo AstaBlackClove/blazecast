@@ -1,7 +1,8 @@
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 // import { ArrowLeft } from "lucide-react";
 
 type Props = {
+  query: string;
   onQueryChange: (query: string) => void;
   onSubmit: () => void;
   onArrowUp: () => void;
@@ -11,6 +12,7 @@ type Props = {
 };
 
 export function CommandInput({
+  query,
   onQueryChange,
   onSubmit,
   onArrowUp,
@@ -18,12 +20,10 @@ export function CommandInput({
   onEscape,
   resetTrigger = 0,
 }: Props) {
-  const [input, setInput] = useState("");
-
   // Reset input when resetTrigger changes
   useEffect(() => {
     if (resetTrigger > 0) {
-      setInput("");
+      query = "";
     }
   }, [resetTrigger]);
 
@@ -47,7 +47,7 @@ export function CommandInput({
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.hidden) {
-        setInput("");
+        query = "";
         onQueryChange("");
       }
     };
@@ -67,9 +67,8 @@ export function CommandInput({
       <input
         autoFocus
         type="text"
-        value={input}
+        value={query}
         onChange={(e) => {
-          setInput(e.target.value);
           onQueryChange(e.target.value);
         }}
         onKeyDown={handleKeyDown}

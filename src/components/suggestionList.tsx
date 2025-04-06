@@ -22,7 +22,6 @@ export function SuggestionList({
       // You would need to implement this API endpoint
       try {
         const status = await invoke<any>("get_index_status");
-        console.log(status)
         setIsIndexBuilding(status.building);
 
         if (status.building) {

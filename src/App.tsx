@@ -11,25 +11,23 @@ function App() {
   const [recentApps, setRecentApps] = useState<Suggestion[]>([]);
 
   // Load recent apps when the app starts
+  const fetchRecentApps = async () => {
+    try {
+      const apps: AppInfo[] = await invoke("get_recent_apps");
+      const recentSuggestions = apps.map((app) => ({
+        ...appToSuggestion(app),
+        action: async () => {
+          await invoke("open_app", { appId: app.id });
+        },
+      }));
+
+      setRecentApps(recentSuggestions);
+    } catch (error) {
+      console.error("Failed to fetch recent apps:", error);
+    }
+  };
+
   useEffect(() => {
-    const fetchRecentApps = async () => {
-      try {
-        // 1. Fetch AppInfo array from backend
-        const apps: AppInfo[] = await invoke("get_recent_apps");
-        // 2. Convert to Suggestion with proper action
-        const recentSuggestions = apps.map((app) => ({
-          ...appToSuggestion(app),
-          action: async () => {
-            await invoke("open_app", { appId: app.id });
-          },
-        }));
-
-        setRecentApps(recentSuggestions);
-      } catch (error) {
-        console.error("Failed to fetch recent apps:", error);
-      }
-    };
-
     fetchRecentApps();
   }, []);
 
@@ -67,27 +65,28 @@ function App() {
   };
 
   // In both openSelectedApp and handleSuggestionClick:
-  const openSelectedApp = () => {
+  const openSelectedApp = async () => {
     const selected: any = displayedSuggestions[selectedIndex];
-    console.log(selected)
     if (selected?.action) {
-      selected
-        .action()
-        .then(() => {
-          invoke("hide_window");
-          setQuery("");
-        })
-        .catch(console.error);
+      try {
+        await selected.action(); // wait for it
+        await invoke("hide_window");
+        setQuery("");
+        await fetchRecentApps();
+      } catch (error) {
+        console.error(error);
+      }
     }
   };
 
   const handleSuggestionClick = (suggestion: any) => {
     if (suggestion?.action) {
       suggestion
-        .action() // Execute the pre-defined action
-        .then(() => {
+        .action()
+        .then(async () => {
           invoke("hide_window");
           setQuery("");
+          await fetchRecentApps();
         })
         .catch(console.error);
     }
@@ -98,6 +97,7 @@ function App() {
       {/* Make command input fixed at top with flex-shrink-0 */}
       <div className="flex-shrink-0">
         <CommandInput
+          query={query}
           onQueryChange={handleQueryChange}
           onSubmit={handleSubmit}
           onArrowUp={handleArrowUp}
