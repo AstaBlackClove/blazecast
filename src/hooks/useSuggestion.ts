@@ -4,6 +4,7 @@ import { shell } from "@tauri-apps/api";
 import { Suggestion, ActionType } from "../types";
 
 interface AppInfo {
+  id: string;
   name: string;
   path: string;
   icon?: string;

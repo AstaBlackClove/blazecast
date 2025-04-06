@@ -3,7 +3,10 @@
 use tauri::GlobalShortcutManager;
 use tauri::Manager;
 mod commands;
-use commands::fetch_app::{search_apps, get_recent_apps, open_app, search_files};
+use commands::fetch_app::{
+    get_index_status, get_recent_apps, init_app_index, open_app,
+    search_apps,
+};
 
 fn main() {
     let tray_menu = tauri::SystemTrayMenu::new()
@@ -11,6 +14,7 @@ fn main() {
         .add_native_item(tauri::SystemTrayMenuItem::Separator)
         .add_item(tauri::CustomMenuItem::new("quit", "Quit"));
     let system_tray = tauri::SystemTray::new().with_menu(tray_menu);
+
     tauri::Builder::default()
         .system_tray(system_tray)
         .on_system_tray_event(|app, event| match event {
@@ -27,8 +31,23 @@ fn main() {
             },
             _ => {}
         })
-        .invoke_handler(tauri::generate_handler![search_apps, get_recent_apps, open_app, search_files])
+        .invoke_handler(tauri::generate_handler![
+            search_apps,
+            get_recent_apps,
+            open_app,
+            get_index_status
+        ])
         .setup(|app| {
+            // Initialize app index state
+            let app_index_state = init_app_index();
+
+            // Make the app index state available to all commands
+            app.manage(app_index_state);
+
+            // Schedule periodic index updates
+            // let app_index = app.state::<AppIndexState>().index.clone();
+            // schedule_index_updates(app_index);
+
             // Register global shortcut (Alt+Space by default)
             let app_handle = app.handle();
             app_handle
@@ -43,9 +62,11 @@ fn main() {
                     }
                 })
                 .unwrap();
+
             // Hide dock icon on macOS
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+
             Ok(())
         })
         .on_window_event(|event| match event.event() {

@@ -37,11 +37,11 @@ export function SuggestionItem({ suggestion, selected, onClick }: Props) {
       )}
       <div className="flex-1">
         <div className="font-normal text-white">{suggestion.title}</div>
-        {suggestion.subtitle && (
+        {/* {suggestion.subtitle && (
           <div className="text-xs text-gray-400 mt-0.5">
             {suggestion.subtitle}
           </div>
-        )}
+        )} */}
       </div>
     </div>
   );
