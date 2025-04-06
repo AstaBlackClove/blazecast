@@ -2,6 +2,23 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Import Rubik Font Files */
+@font-face {
+  font-family: "Rubik";
+  src: url("/assets/Rubik-Regular.ttf") format("truetype");
+  font-weight: 400; /* Normal */
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Rubik";
+  src: url("/assets/Rubik-Bold.ttf") format("truetype");
+  font-weight: 700; /* Bold */
+  font-style: normal;
+  font-display: swap;
+}
+
 .logo.vite:hover {
   filter: drop-shadow(0 0 2em #747bff);
 }
@@ -10,7 +27,8 @@
   filter: drop-shadow(0 0 2em #61dafb);
 }
 :root {
-  font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
+  --app-fontFamily: "Rubik", sans-serif;
+  font-family: var(--app-fontFamily);
   font-size: 16px;
   line-height: 24px;
   font-weight: 400;
@@ -23,6 +41,10 @@
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   -webkit-text-size-adjust: 100%;
+}
+
+* {
+  font-family: inherit; /* or var(--app-fontFamily) */
 }
 
 .container {
@@ -119,7 +141,10 @@ button {
   }
 }
 
-html, body, #root {
+html,
+body,
+#root {
+  font-family: var(--app-fontFamily);
   margin: 0;
   padding: 0;
   background: transparent !important;
