@@ -23,7 +23,7 @@ export function CommandInput({
   // Reset input when resetTrigger changes
   useEffect(() => {
     if (resetTrigger > 0) {
-      query = "";
+      onQueryChange("");
     }
   }, [resetTrigger]);
 
@@ -47,7 +47,7 @@ export function CommandInput({
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.hidden) {
-        query = "";
+        onQueryChange("");
         onQueryChange("");
       }
     };

@@ -9,6 +9,10 @@ type Props = {
   onSuggestionClick: (suggestion: Suggestion) => void;
 };
 
+type IndexStatus = {
+  building: boolean;
+};
+
 export function SuggestionList({
   suggestions,
   selectedIndex,
@@ -21,7 +25,7 @@ export function SuggestionList({
     const checkIndexStatus = async () => {
       // You would need to implement this API endpoint
       try {
-        const status = await invoke<any>("get_index_status");
+        const status = await invoke<IndexStatus>("get_index_status");
         setIsIndexBuilding(status.building);
 
         if (status.building) {
@@ -65,8 +69,16 @@ export function SuggestionList({
     return absoluteIndex + itemIndex;
   };
 
+  if (isIndexBuilding) {
+    return (
+      <div className="text-center text-gray-400 p-4">
+        Building app index... 🔄
+      </div>
+    );
+  }
+
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full bg-gray-800">
       {/* Main scrollable area that takes available height */}
       <div className="flex-grow overflow-y-auto">
         {isIndexBuilding ? (

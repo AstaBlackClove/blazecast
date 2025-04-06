@@ -93,7 +93,7 @@ function App() {
   };
 
   return (
-    <div className="flex flex-col w-full h-full bg-black/90 backdrop-blur-xl rounded-xl overflow-hidden shadow-2xl border border-gray-700">
+    <div className="flex flex-col w-full h-full rounded-xl overflow-hidden border border-gray-700">
       {/* Make command input fixed at top with flex-shrink-0 */}
       <div className="flex-shrink-0">
         <CommandInput
