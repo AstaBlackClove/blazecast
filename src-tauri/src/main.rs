@@ -4,8 +4,7 @@ use tauri::GlobalShortcutManager;
 use tauri::Manager;
 mod commands;
 use commands::fetch_app::{
-    get_index_status, get_recent_apps, init_app_index, open_app,
-    search_apps,
+    get_index_status, get_recent_apps, hide_window, init_app_index, open_app, search_apps,
 };
 
 fn main() {
@@ -35,7 +34,8 @@ fn main() {
             search_apps,
             get_recent_apps,
             open_app,
-            get_index_status
+            get_index_status,
+            hide_window
         ])
         .setup(|app| {
             // Initialize app index state

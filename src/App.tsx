@@ -1,41 +1,121 @@
-import { useState } from "react";
-import { appWindow } from "@tauri-apps/api/window";
-import { useSuggestions } from "./hooks/useSuggestion";
+import { useState, useEffect } from "react";
+import { invoke } from "@tauri-apps/api/tauri";
 import { CommandInput } from "./components/commandInput";
 import { SuggestionList } from "./components/suggestionList";
 import { Suggestion } from "./types";
+import { appToSuggestion, AppInfo } from "./types";
 
 function App() {
   const [query, setQuery] = useState("");
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
-  const suggestions = useSuggestions(query);
+  const [searchResults, setSearchResults] = useState<AppInfo[]>([]);
+  const [recentApps, setRecentApps] = useState<AppInfo[]>([]);
+  const [hasStartedTyping, setHasStartedTyping] = useState(false);
+  const [resetInputTrigger, setResetInputTrigger] = useState(0);
+
+  // Load recent apps for reference, but don't display them initially
+  useEffect(() => {
+    const fetchRecentApps = async () => {
+      try {
+        const apps = await invoke<AppInfo[]>("get_recent_apps");
+        setRecentApps(apps);
+        // Don't set suggestions here
+      } catch (error) {
+        console.error("Failed to fetch recent apps:", error);
+      }
+    };
+
+    fetchRecentApps();
+  }, []);
+
+  // Search for apps when query changes
+  useEffect(() => {
+    const searchApps = async () => {
+      if (query.trim() === "") {
+        // Clear suggestions if query is empty
+        setSuggestions([]);
+        setSelectedIndex(0);
+        setHasStartedTyping(false);
+        return;
+      }
+
+      // User has started typing
+      setHasStartedTyping(true);
+
+      try {
+        const results = await invoke<AppInfo[]>("search_apps", { query });
+        setSearchResults(results);
+
+        // Convert to suggestions
+        const suggestions = results.map(appToSuggestion);
+        setSuggestions(suggestions);
+        setSelectedIndex(0);
+      } catch (error) {
+        console.error("Failed to search apps:", error);
+      }
+    };
+
+    // Debounce search to avoid too many requests
+    const timer = setTimeout(() => {
+      searchApps();
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  const handleQueryChange = (newQuery: string) => {
+    setQuery(newQuery);
+  };
 
   const handleSubmit = () => {
     if (suggestions.length > 0) {
-      suggestions[selectedIndex].action();
-      setQuery("");
-      appWindow.hide();
+      openSelectedApp();
     }
   };
 
   const handleArrowUp = () => {
-    setSelectedIndex((prev) => (prev > 0 ? prev - 1 : 0));
+    setSelectedIndex((prev) => (prev > 0 ? prev - 1 : suggestions.length - 1));
   };
 
   const handleArrowDown = () => {
-    setSelectedIndex((prev) =>
-      prev < suggestions.length - 1 ? prev + 1 : prev
-    );
+    setSelectedIndex((prev) => (prev < suggestions.length - 1 ? prev + 1 : 0));
   };
 
   const handleEscape = () => {
-    appWindow.hide();
+    // Hide the window
+    invoke("hide_window");
+  };
+
+  const openSelectedApp = () => {
+    const selected = suggestions[selectedIndex];
+    if (selected) {
+      invoke("open_app", { appId: selected.id })
+        .then(() => {
+          // Hide the window after launching the app
+          invoke("hide_window");
+          // Clear the search
+          setQuery("");
+          // Trigger input reset
+          setResetInputTrigger(prev => prev + 1);
+        })
+        .catch((error) => {
+          console.error("Failed to open app:", error);
+        });
+    }
   };
 
   const handleSuggestionClick = (suggestion: Suggestion) => {
-    suggestion.action();
-    setQuery("");
-    appWindow.hide();
+    invoke("open_app", { appId: suggestion.id })
+      .then(() => {
+        // Hide the window after launching the app
+        invoke("hide_window");
+        // Clear the search
+        setQuery("");
+      })
+      .catch((error) => {
+        console.error("Failed to open app:", error);
+      });
   };
 
   return (
@@ -43,14 +123,12 @@ function App() {
       {/* Make command input fixed at top with flex-shrink-0 */}
       <div className="flex-shrink-0">
         <CommandInput
-          onQueryChange={(q) => {
-            setQuery(q);
-            setSelectedIndex(0); // Reset selection when query changes
-          }}
+          onQueryChange={handleQueryChange}
           onSubmit={handleSubmit}
           onArrowUp={handleArrowUp}
           onArrowDown={handleArrowDown}
           onEscape={handleEscape}
+          resetTrigger={resetInputTrigger}
         />
       </div>
 
@@ -60,6 +138,7 @@ function App() {
           suggestions={suggestions}
           selectedIndex={selectedIndex}
           onSuggestionClick={handleSuggestionClick}
+          isTyping={hasStartedTyping}
         />
       </div>
     </div>

@@ -7,6 +7,7 @@ type Props = {
   onArrowUp: () => void;
   onArrowDown: () => void;
   onEscape: () => void;
+  resetTrigger?: number;
 };
 
 export function CommandInput({
@@ -15,8 +16,16 @@ export function CommandInput({
   onArrowUp,
   onArrowDown,
   onEscape,
+  resetTrigger = 0,
 }: Props) {
   const [input, setInput] = useState("");
+
+  // Reset input when resetTrigger changes
+  useEffect(() => {
+    if (resetTrigger > 0) {
+      setInput("");
+    }
+  }, [resetTrigger]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
