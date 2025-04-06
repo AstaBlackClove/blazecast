@@ -43,6 +43,17 @@ export function SuggestionItem({ suggestion, selected, onClick }: Props) {
           </div>
         )} */}
       </div>
+
+      {suggestion.category === "Web Search" && (
+        <span className="text-xs text-gray-400 px-2 py-1 rounded bg-gray-700">
+          Web
+        </span>
+      )}
+      {suggestion.category === "File Search" && (
+        <span className="text-xs text-gray-400 px-2 py-1 rounded bg-gray-700">
+          Files
+        </span>
+      )}
     </div>
   );
 }

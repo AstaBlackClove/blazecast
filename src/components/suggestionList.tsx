@@ -7,23 +7,22 @@ type Props = {
   suggestions: Suggestion[];
   selectedIndex: number;
   onSuggestionClick: (suggestion: Suggestion) => void;
-  isTyping: boolean;  // Add this prop to track if user is typing
 };
 
 export function SuggestionList({
   suggestions,
   selectedIndex,
   onSuggestionClick,
-  isTyping,
 }: Props) {
   const [isIndexBuilding, setIsIndexBuilding] = useState(false);
 
   // Check if app index is being built initially
   useEffect(() => {
     const checkIndexStatus = async () => {
+      // You would need to implement this API endpoint
       try {
         const status = await invoke<any>("get_index_status");
-        console.log(status);
+        console.log(status)
         setIsIndexBuilding(status.building);
 
         if (status.building) {
@@ -78,15 +77,7 @@ export function SuggestionList({
               Building app index...
             </div>
           </div>
-        ) : !isTyping ? (
-          // Show this when user hasn't started typing
-          <div className="flex justify-center items-center h-full">
-            <div className="text-gray-500 text-center py-8">
-              Start typing to search for applications
-            </div>
-          </div>
         ) : isEmpty ? (
-          // Show this when user is typing but no results
           <div className="flex justify-center items-center h-full">
             <div className="text-gray-500 text-center py-8">
               No matching results

@@ -1,14 +1,7 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/tauri";
 import { shell } from "@tauri-apps/api";
-import { Suggestion, ActionType } from "../types";
-
-interface AppInfo {
-  id: string;
-  name: string;
-  path: string;
-  icon?: string;
-}
+import { Suggestion, AppInfo, ActionType } from "../types";
 
 export function useSuggestions(query: string): Suggestion[] {
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
@@ -16,27 +9,29 @@ export function useSuggestions(query: string): Suggestion[] {
   useEffect(() => {
     const fetchSuggestions = async () => {
       const results: Suggestion[] = [];
+      const trimmedQuery = query.trim();
+      const searchQuery = query.startsWith("?") ? query.slice(1) : query;
 
-      // If query is empty, return empty suggestions
-      if (!query.trim()) {
-        return setSuggestions([]);
+      if (!trimmedQuery) {
+        setSuggestions([]);
+        return;
       }
 
-      // First, search for apps that match the query
+      // Fetch app results first
       try {
-        const appResults = await invoke<AppInfo[]>("search_apps", { query });
-
-        // Add app results first
+        const appResults: AppInfo[] = await invoke("search_apps", {
+          query: trimmedQuery,
+        });
         appResults.forEach((app) => {
           results.push({
-            id: `${ActionType.APP}_${app.name}`,
+            id: app.id,
             title: app.name,
             subtitle: `Open ${app.name}`,
             category: "Applications",
             icon: app.icon,
             action: async () => {
               try {
-                await invoke("open_app", { path: app.path });
+                await invoke("open_app", { appId: app.id });
               } catch (error) {
                 console.error(`Failed to open ${app.name}:`, error);
               }
@@ -47,16 +42,14 @@ export function useSuggestions(query: string): Suggestion[] {
         console.error("Failed to fetch app suggestions:", error);
       }
 
-      // Only add other actions if there are no app results or explicitly requested
-      if (results.length === 0 || query.startsWith("?")) {
-        // Remove the ? prefix for web searches
-        const searchQuery = query.startsWith("?") ? query.slice(1) : query;
-
-        results.push({
-          id: ActionType.SEARCH_GOOGLE,
+      // Always add search actions at the bottom
+      const searchActions: Suggestion[] = [
+        {
+          id: `${ActionType.SEARCH_GOOGLE}_${searchQuery}`,
           title: `Search Google for "${searchQuery}"`,
-          subtitle: `Open Google search for "${searchQuery}"`,
+          subtitle: `www.google.com`,
           category: "Web Search",
+          icon: "https://www.google.com/favicon.ico",
           action: () => {
             shell.open(
               `https://www.google.com/search?q=${encodeURIComponent(
@@ -64,13 +57,13 @@ export function useSuggestions(query: string): Suggestion[] {
               )}`
             );
           },
-        });
-
-        results.push({
-          id: ActionType.SEARCH_FILES,
-          title: `Search Files for "${searchQuery}"`,
-          subtitle: `Search for "${searchQuery}" in your files`,
-          category: "System",
+        },
+        {
+          id: `${ActionType.SEARCH_FILES}_${searchQuery}`,
+          title: `Find files matching "${searchQuery}"`,
+          subtitle: `Search local files`,
+          category: "File Search",
+          icon: "📁",
           action: async () => {
             try {
               await invoke("search_files", { query: searchQuery });
@@ -78,17 +71,13 @@ export function useSuggestions(query: string): Suggestion[] {
               console.error("Failed to search files:", error);
             }
           },
-        });
-      }
+        },
+      ];
 
-      setSuggestions(results);
+      setSuggestions([...results, ...searchActions]);
     };
 
-    // Debounce function to avoid too many requests
-    const timeoutId = setTimeout(() => {
-      fetchSuggestions();
-    }, 100); // Reduced debounce time for faster app search
-
+    const timeoutId = setTimeout(fetchSuggestions, 100);
     return () => clearTimeout(timeoutId);
   }, [query]);
 

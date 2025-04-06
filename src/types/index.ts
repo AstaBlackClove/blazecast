@@ -1,3 +1,4 @@
+// types.ts
 export interface Suggestion {
   id: string;
   title: string;
@@ -6,6 +7,7 @@ export interface Suggestion {
   iconColor?: string;
   path?: string;
   category: string;
+  action?: () => void | Promise<void>; // Add action property
 }
 
 export interface AppInfo {
@@ -18,6 +20,13 @@ export interface AppInfo {
   access_count: number;
 }
 
+// Add ActionType enum
+export enum ActionType {
+  APP = "app",
+  SEARCH_GOOGLE = "search_google",
+  SEARCH_FILES = "search_files",
+}
+
 // Convert AppInfo from backend to Suggestion for frontend
 export function appToSuggestion(app: AppInfo): Suggestion {
   return {
@@ -26,6 +35,6 @@ export function appToSuggestion(app: AppInfo): Suggestion {
     subtitle: app.path,
     icon: app.icon,
     path: app.path,
-    category: app.category
+    category: app.category,
   };
 }
