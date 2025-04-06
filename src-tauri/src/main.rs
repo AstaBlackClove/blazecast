@@ -2,7 +2,9 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 use tauri::GlobalShortcutManager;
 use tauri::Manager;
+mod auto;
 mod commands;
+use auto::auto_start::enable_autostart;
 use commands::fetch_app::{
     get_index_status, get_recent_apps, hide_window, init_app_index, open_app, search_apps,
 };
@@ -62,6 +64,9 @@ fn main() {
                     }
                 })
                 .unwrap();
+
+            // Enable auto-start during setup
+            enable_autostart();
 
             // Hide dock icon on macOS
             #[cfg(target_os = "macos")]
