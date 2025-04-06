@@ -45,6 +45,18 @@ export function useSuggestions(query: string): Suggestion[] {
       // Always add search actions at the bottom
       const searchActions: Suggestion[] = [
         {
+          id: `${ActionType.SEARCH_DUCKDUCKGO}_${searchQuery}`,
+          title: `Search DuckDuckGo for "${searchQuery}"`,
+          subtitle: `duckduckgo.com`,
+          category: "Web Search",
+          icon: "https://duckduckgo.com/favicon.ico",
+          action: () => {
+            shell.open(
+              `https://duckduckgo.com/?q=${encodeURIComponent(searchQuery)}`
+            );
+          },
+        },
+        {
           id: `${ActionType.SEARCH_GOOGLE}_${searchQuery}`,
           title: `Search Google for "${searchQuery}"`,
           subtitle: `www.google.com`,

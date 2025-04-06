@@ -24,6 +24,7 @@ export interface AppInfo {
 export enum ActionType {
   APP = "app",
   SEARCH_GOOGLE = "search_google",
+  SEARCH_DUCKDUCKGO = "search_duckduckgo",
   SEARCH_FILES = "search_files",
 }
 
