@@ -1,5 +1,4 @@
 import { useEffect } from "react";
-// import { ArrowLeft } from "lucide-react";
 
 type Props = {
   query: string;
@@ -9,6 +8,8 @@ type Props = {
   onArrowDown: () => void;
   onEscape: () => void;
   resetTrigger?: number;
+  showBackButton?: boolean;
+  onBackClick?: () => void;
 };
 
 export function CommandInput({
@@ -19,6 +20,8 @@ export function CommandInput({
   onArrowDown,
   onEscape,
   resetTrigger = 0,
+  showBackButton = false,
+  onBackClick,
 }: Props) {
   // Reset input when resetTrigger changes
   useEffect(() => {
@@ -51,9 +54,7 @@ export function CommandInput({
         onQueryChange("");
       }
     };
-
     document.addEventListener("visibilitychange", handleVisibilityChange);
-
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
@@ -61,9 +62,27 @@ export function CommandInput({
 
   return (
     <div className="flex items-center bg-gray-700 border-b border-gray-800 px-3 py-2">
-      {/* <div className="text-gray-500 mr-2">
-        <ArrowLeft size={16} />
-      </div> */}
+      {showBackButton && (
+        <div
+          className="text-gray-400 hover:text-white cursor-pointer mr-2"
+          onClick={onBackClick}
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M19 12H5" />
+            <path d="M12 19l-7-7 7-7" />
+          </svg>
+        </div>
+      )}
       <input
         autoFocus
         type="text"
@@ -72,7 +91,11 @@ export function CommandInput({
           onQueryChange(e.target.value);
         }}
         onKeyDown={handleKeyDown}
-        placeholder="Search for apps and commands..."
+        placeholder={
+          showBackButton
+            ? "Clipboard history..."
+            : "Search for apps and commands or type 'clip' for clipboard..."
+        }
         className="w-full p-3 rounded-xl bg-white/5 backdrop-blur-none text-white placeholder-white/50 focus:outline-none focus:ring-2 transition-all duration-300 ease-in-out focus:bg-white/10 focus:backdrop-blur-md"
       />
     </div>

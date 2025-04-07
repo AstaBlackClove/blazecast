@@ -26,6 +26,11 @@
         "hide": true,
         "show": true,
         "setFocus": true
+      },
+      "clipboard": {
+        "all": true,
+        "readText": true,
+        "writeText": true
       }
     },
     "systemTray": {
