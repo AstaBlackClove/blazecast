@@ -19,7 +19,7 @@ export function SuggestionItem({ suggestion, selected, onClick }: Props) {
   return (
     <div
       className={`flex items-center cursor-pointer px-4 py-3 transition-colors duration-150 rounded-md m-2 ${
-        selected ? "bg-gray-500 rounded-md m-2" : "hover:bg-gray-800"
+        selected ? "bg-gray-900 rounded-md m-2 shadow-lg ring-1 ring-blue-400" : "hover:bg-gray-800"
       }`}
       onClick={onClick}
       ref={ref}

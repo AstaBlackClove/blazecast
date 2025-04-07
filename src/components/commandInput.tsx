@@ -60,7 +60,7 @@ export function CommandInput({
   }, [onQueryChange]);
 
   return (
-    <div className="flex items-center border-b border-gray-800 px-3 py-2">
+    <div className="flex items-center bg-gray-700 border-b border-gray-800 px-3 py-2">
       {/* <div className="text-gray-500 mr-2">
         <ArrowLeft size={16} />
       </div> */}
