@@ -43,7 +43,7 @@
         "title": "blazecast",
         "width": 600,
         "height": 400,
-        "resizable": false,
+        "resizable": true,
         "fullscreen": false,
         "decorations": false,
         "transparent": true,

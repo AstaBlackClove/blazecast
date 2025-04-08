@@ -14,9 +14,9 @@ export const ClipboardHistory: React.FC<ClipboardHistoryProps> = ({
   onDelete,
   onClear,
 }) => {
-  const [copyStatus, setCopyStatus] = useState<
-    "idle" | "copying" | "success" | "error"
-  >("idle");
+  // const [copyStatus, setCopyStatus] = useState<
+  //   "idle" | "copying" | "success" | "error"
+  // >("idle");
   const [selectedIndex, setSelectedIndex] = useState<number>(
     history.length > 0 ? 0 : -1
   );
@@ -28,7 +28,6 @@ export const ClipboardHistory: React.FC<ClipboardHistoryProps> = ({
   const [menuSelectedIndex, setMenuSelectedIndex] = useState<number>(0);
   const historyRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
-  const [windowSize, setWindowSize] = useState({ width: 800, height: 600 });
 
   // Format timestamp to display in a readable format
   const formatTimestamp = (timestamp: number) => {
@@ -44,22 +43,6 @@ export const ClipboardHistory: React.FC<ClipboardHistoryProps> = ({
       second: "2-digit",
     })}`;
   };
-
-  // Handle window resize for Tauri
-  useEffect(() => {
-    // For Tauri app, we could get the window size from window API
-    const handleResize = () => {
-      setWindowSize({
-        width: window.innerWidth,
-        height: window.innerHeight,
-      });
-    };
-
-    window.addEventListener("resize", handleResize);
-    handleResize(); // Initial call
-
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
 
   // Handle keyboard navigation
   useEffect(() => {
@@ -170,10 +153,7 @@ export const ClipboardHistory: React.FC<ClipboardHistoryProps> = ({
       : null;
 
   return (
-    <div
-      className="flex flex-col w-full h-full bg-gray-900 text-gray-200 overflow-hidden"
-      style={{ width: windowSize.width, height: windowSize.height }}
-    >
+    <div className="flex flex-col w-full h-full bg-gray-900 text-gray-200 overflow-hidden">
       <div className="flex justify-between items-center p-3 border-b border-gray-700 bg-gray-800">
         <div className="flex items-center">
           <h2 className="text-lg font-medium">Clipboard History</h2>
@@ -209,54 +189,66 @@ export const ClipboardHistory: React.FC<ClipboardHistoryProps> = ({
         </button>
       </div>
 
-      <div className="flex flex-grow overflow-hidden">
-        <div className="w-1/4 p-3 border-r border-gray-700 bg-gray-800">
-          <div className="font-medium mb-2">Pinned</div>
-          <div className="text-gray-400 text-sm mb-1">#FF6363</div>
-          <div className="text-gray-400 text-sm mb-4">https://raycast.com</div>
-
-          <div className="font-medium mb-2">Most recent</div>
-          <div className="text-gray-400 text-sm">Clipboard items</div>
-        </div>
-
-        <div ref={historyRef} className="flex-grow overflow-y-auto">
-          {history.length === 0 ? (
-            <div className="flex items-center justify-center h-full text-gray-400">
-              Your clipboard history will appear here
+      <div className="flex flex-grow overflow-hidden h-full">
+        <div className="w-1/4 border-r border-gray-700 bg-gray-800 flex flex-col h-full">
+          <div className="p-3 border-b">
+            <div className="font-medium mb-2">Pinned</div>
+            <div className="text-gray-400 text-sm mb-1">#FF6363</div>
+            <div className="text-gray-400 text-sm mb-4">
+              https://raycast.com
             </div>
-          ) : (
-            <div className="overflow-y-auto">
-              {history.map((item, index) => (
-                <div
-                  id={`clipboard-item-${index}`}
-                  key={item.id}
-                  className={`p-3 border-b border-gray-700 hover:bg-gray-800 flex justify-between ${
-                    selectedIndex === index ? "bg-gray-700" : ""
-                  }`}
-                  onClick={() => handleItemClick(index)}
-                  onContextMenu={(e) => openActionMenu(index, e)}
-                >
-                  <div className="flex flex-col w-full">
-                    <div className="flex justify-between items-start">
-                      <span className="text-xs text-gray-400">
-                        {formatTimestamp(item.timestamp)}
-                      </span>
-                    </div>
-                    <div className="mt-1 overflow-hidden overflow-ellipsis whitespace-nowrap">
-                      {item.text.length > 100
-                        ? `${item.text.substring(0, 100)}...`
-                        : item.text}
+
+            {/* <div className="font-medium mb-2">Most recent</div> */}
+            <div className="font-medium">Clipboard items</div>
+          </div>
+          <div ref={historyRef} className="flex-grow overflow-y-auto">
+            {history.length === 0 ? (
+              <div className="flex items-center justify-center h-full text-gray-400">
+                Your clipboard history will appear here
+              </div>
+            ) : (
+              <div className="h-full overflow-y-auto">
+                {history.map((item, index) => (
+                  <div
+                    id={`clipboard-item-${index}`}
+                    key={item.id}
+                    className={`p-3 border-b border-gray-700 hover:bg-gray-800 flex justify-between ${
+                      selectedIndex === index ? "bg-gray-700" : ""
+                    }`}
+                    onClick={() => handleItemClick(index)}
+                    onContextMenu={(e) => openActionMenu(index, e)}
+                  >
+                    <div className="flex flex-col w-full">
+                      <div className="flex justify-between items-start">
+                        <span className="text-xs text-gray-400">
+                          {formatTimestamp(item.timestamp)}
+                        </span>
+                      </div>
+                      <div className="mt-1 overflow-hidden overflow-ellipsis whitespace-nowrap">
+                        {item.text.length > 100
+                          ? `${item.text.substring(0, 100)}...`
+                          : item.text}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
-        <div className="w-1/4 p-3 border-l border-gray-700 bg-gray-800 overflow-y-auto">
+        <div className="flex-grow p-3 border-l border-gray-700 bg-gray-800 overflow-y-auto">
           {selectedItem ? (
             <>
+              <div className=" border-gray-700 mb-2">
+                <h3 className="font-medium mb-2">Content</h3>
+                <div className="bg-gray-900 p-3 rounded overflow-y-auto max-h-52">
+                  <pre className="text-sm whitespace-pre-wrap break-words">
+                    {selectedItem.text}
+                  </pre>
+                </div>
+              </div>
+
               <div className="font-medium mb-2">Information</div>
               <div className="text-sm mb-4">
                 <div className="flex justify-between mb-1">
@@ -273,16 +265,7 @@ export const ClipboardHistory: React.FC<ClipboardHistoryProps> = ({
                 </div>
               </div>
 
-              <div className="my-4 border-t border-gray-700 pt-4">
-                <h3 className="font-medium mb-2">Content</h3>
-                <div className="bg-gray-900 p-3 rounded overflow-y-auto max-h-64">
-                  <pre className="text-sm whitespace-pre-wrap break-words">
-                    {selectedItem.text}
-                  </pre>
-                </div>
-              </div>
-
-              <div className="mt-4">
+              {/* <div className="mt-4">
                 <button
                   className="w-full py-2 px-4 bg-gray-700 hover:bg-gray-600 rounded flex items-center justify-center"
                   onClick={async () => {
@@ -311,7 +294,7 @@ export const ClipboardHistory: React.FC<ClipboardHistoryProps> = ({
                     ⌘
                   </span>
                 </button>
-              </div>
+              </div> */}
             </>
           ) : (
             <div className="flex items-center justify-center h-full text-gray-400">
@@ -325,9 +308,9 @@ export const ClipboardHistory: React.FC<ClipboardHistoryProps> = ({
         <div className="flex justify-between items-center">
           <div>Actions</div>
           <div className="flex items-center space-x-2">
-            <span className="bg-gray-800 px-2 py-1 rounded">↵</span>
-            <span>Copy</span>
-            <span className="bg-gray-800 px-2 py-1 rounded">⌃K</span>
+            {/* <span className="bg-gray-800 px-2 py-1 rounded">↵</span>
+            <span>Copy</span> */}
+            <span className="bg-gray-800 px-2 py-1 rounded">CTRL + K</span>
             <span>Menu</span>
           </div>
         </div>

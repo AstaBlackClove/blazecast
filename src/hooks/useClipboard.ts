@@ -13,6 +13,12 @@ export const useClipboardHistory = () => {
   const clipboardIntervalRef = useRef<number | null>(null);
   const isInClearing = useRef(false);
 
+  // Dynamic interval management
+  const noChangeCountRef = useRef(0);
+  const baseInterval = 1000; // Start with 1 second
+  const maxInterval = 5000; // Maximum interval of 5 seconds
+  const currentIntervalRef = useRef(baseInterval);
+
   // Save history to file system
   const saveHistoryToStorage = async (history: ClipboardItem[]) => {
     try {
@@ -34,44 +40,70 @@ export const useClipboardHistory = () => {
     }
   };
 
-  // Start monitoring clipboard for changes
-  const startClipboardMonitoring = () => {
-    clipboardIntervalRef.current = window.setInterval(async () => {
-      if (isInClearing.current) return;
+  // Check clipboard content
+  const checkClipboard = async () => {
+    if (isInClearing.current) return;
 
-      try {
-        const currentContent = await invoke<string>("get_clipboard");
+    try {
+      const currentContent = await invoke<string>("get_clipboard");
 
-        if (currentContent && currentContent !== lastClipboardContent) {
-          console.log("New clipboard content:", currentContent);
-          setLastClipboardContent(currentContent);
+      if (currentContent && currentContent !== lastClipboardContent) {
+        // Reset interval when clipboard changes
+        currentIntervalRef.current = baseInterval;
+        noChangeCountRef.current = 0;
 
-          setClipboardHistory((prev) => {
-            if (prev.some((item) => item.text === currentContent)) {
-              return prev;
-            }
+        console.log("New clipboard content detected");
+        setLastClipboardContent(currentContent);
 
-            const newItem = {
-              id: Date.now(),
-              text: currentContent,
-              timestamp: Date.now(),
-            };
+        setClipboardHistory((prev) => {
+          if (prev.some((item) => item.text === currentContent)) {
+            return prev;
+          }
 
-            const updatedHistory = [newItem, ...prev.slice(0, 99)];
-            saveHistoryToStorage(updatedHistory);
-            return updatedHistory;
-          });
+          const newItem = {
+            id: Date.now(),
+            text: currentContent,
+            timestamp: Date.now(),
+          };
+
+          const updatedHistory = [newItem, ...prev.slice(0, 99)];
+          saveHistoryToStorage(updatedHistory);
+          return updatedHistory;
+        });
+      } else {
+        // Increase interval gradually when no changes detected
+        noChangeCountRef.current++;
+
+        // Adjust the interval (exponential backoff with cap)
+        if (noChangeCountRef.current > 5) {
+          // Increase interval after 5 consecutive checks with no changes
+          currentIntervalRef.current = Math.min(
+            currentIntervalRef.current * 1.5,
+            maxInterval
+          );
         }
-      } catch (error) {
-        console.error("Clipboard monitoring error:", error);
       }
-    }, 1000);
+    } catch (error) {
+      console.error("Clipboard monitoring error:", error);
+    }
+
+    // Schedule next check with dynamic interval
+    clipboardIntervalRef.current = window.setTimeout(
+      checkClipboard,
+      currentIntervalRef.current
+    );
   };
 
-  // Rest of your hook implementation...
+  // Start monitoring clipboard for changes
+  const startClipboardMonitoring = () => {
+    // Initial check
+    checkClipboard();
+  };
+
+  // Stop clipboard monitoring
   const stopClipboardMonitoring = () => {
     if (clipboardIntervalRef.current) {
-      clearInterval(clipboardIntervalRef.current);
+      clearTimeout(clipboardIntervalRef.current);
       clipboardIntervalRef.current = null;
     }
   };
@@ -79,6 +111,11 @@ export const useClipboardHistory = () => {
   const copyToClipboard = async (text: string) => {
     try {
       await invoke("set_clipboard", { text });
+
+      // Reset interval when user explicitly copies something
+      currentIntervalRef.current = baseInterval;
+      noChangeCountRef.current = 0;
+
       return true;
     } catch (error) {
       console.error("Failed to copy to clipboard:", error);
@@ -103,13 +140,22 @@ export const useClipboardHistory = () => {
     });
   };
 
-  // Initialize
+  // Initialize and cleanup
   useEffect(() => {
     loadHistoryFromStorage();
     startClipboardMonitoring();
 
+    // Reset interval when window regains focus
+    const handleFocus = () => {
+      currentIntervalRef.current = baseInterval;
+      noChangeCountRef.current = 0;
+    };
+
+    window.addEventListener("focus", handleFocus);
+
     return () => {
       stopClipboardMonitoring();
+      window.removeEventListener("focus", handleFocus);
     };
   }, []);
 

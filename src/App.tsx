@@ -49,6 +49,7 @@ function App() {
       setMode("clipboard");
       setQuery(""); // Clear the input after switching modes
       setResetTrigger((prev) => prev + 1);
+      invoke("resize_window", { width: 800, height: 600 });
     }
   }, [query]);
 
@@ -84,6 +85,7 @@ function App() {
     // If in clipboard mode, switch back to apps mode
     if (mode === "clipboard") {
       setMode("apps");
+      invoke("resize_window", { width: 600, height: 400 });
       return;
     }
 
@@ -95,6 +97,8 @@ function App() {
     setMode("apps");
     setQuery("");
     setResetTrigger((prev) => prev + 1);
+    // Resize back to original size
+    invoke("resize_window", { width: 600, height: 400 });
   };
 
   // In both openSelectedApp and handleSuggestionClick:

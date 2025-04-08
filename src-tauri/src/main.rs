@@ -5,6 +5,7 @@ use tauri::Manager;
 mod auto;
 mod commands;
 use auto::auto_start::enable_autostart;
+use commands::window_resize::resize_window;
 use commands::clip_board::{
     get_clipboard, load_clipboard_history, save_clipboard_history, set_clipboard,
 };
@@ -44,7 +45,8 @@ fn main() {
             get_clipboard,
             set_clipboard,
             load_clipboard_history,
-            save_clipboard_history
+            save_clipboard_history,
+            resize_window
         ])
         .setup(|app| {
             // Initialize app index state
