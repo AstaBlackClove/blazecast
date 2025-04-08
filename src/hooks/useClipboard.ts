@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { clipboard } from "@tauri-apps/api";
+import { invoke } from "@tauri-apps/api/tauri";
 
 export interface ClipboardItem {
   id: number;
@@ -13,26 +13,42 @@ export const useClipboardHistory = () => {
   const clipboardIntervalRef = useRef<number | null>(null);
   const isInClearing = useRef(false);
 
+  // Save history to file system
+  const saveHistoryToStorage = async (history: ClipboardItem[]) => {
+    try {
+      const historyData = JSON.stringify({ items: history });
+      await invoke("save_clipboard_history", { historyData });
+    } catch (error) {
+      console.error("Failed to save history to storage:", error);
+    }
+  };
+
+  // Load history from file system
+  const loadHistoryFromStorage = async () => {
+    try {
+      const historyData = await invoke<string>("load_clipboard_history");
+      const parsed = JSON.parse(historyData);
+      setClipboardHistory(parsed.items || []);
+    } catch (error) {
+      console.error("Failed to load history from storage:", error);
+    }
+  };
+
   // Start monitoring clipboard for changes
   const startClipboardMonitoring = () => {
-    // Check every 1 second (adjust as needed)
     clipboardIntervalRef.current = window.setInterval(async () => {
-      // Skip checking if we're in the process of clearing the clipboard
       if (isInClearing.current) return;
 
       try {
-        const currentContent = await clipboard.readText();
+        const currentContent = await invoke<string>("get_clipboard");
 
-        // Only add to history if content changed and isn't empty
         if (currentContent && currentContent !== lastClipboardContent) {
           console.log("New clipboard content:", currentContent);
           setLastClipboardContent(currentContent);
 
-          // Add to history (at beginning of array)
           setClipboardHistory((prev) => {
-            // Check if this content already exists in recent history to avoid duplicates
             if (prev.some((item) => item.text === currentContent)) {
-              return prev; // Don't add duplicates
+              return prev;
             }
 
             const newItem = {
@@ -41,10 +57,8 @@ export const useClipboardHistory = () => {
               timestamp: Date.now(),
             };
 
-            // Store in localStorage for persistence
-            const updatedHistory = [newItem, ...prev.slice(0, 99)]; // Keep last 100 items
+            const updatedHistory = [newItem, ...prev.slice(0, 99)];
             saveHistoryToStorage(updatedHistory);
-
             return updatedHistory;
           });
         }
@@ -54,7 +68,7 @@ export const useClipboardHistory = () => {
     }, 1000);
   };
 
-  // Stop monitoring clipboard
+  // Rest of your hook implementation...
   const stopClipboardMonitoring = () => {
     if (clipboardIntervalRef.current) {
       clearInterval(clipboardIntervalRef.current);
@@ -62,10 +76,9 @@ export const useClipboardHistory = () => {
     }
   };
 
-  // Copy item from history to clipboard
   const copyToClipboard = async (text: string) => {
     try {
-      await clipboard.writeText(text);
+      await invoke("set_clipboard", { text });
       return true;
     } catch (error) {
       console.error("Failed to copy to clipboard:", error);
@@ -73,19 +86,15 @@ export const useClipboardHistory = () => {
     }
   };
 
-  // Clear all clipboard history
   const clearHistory = () => {
     isInClearing.current = true;
     setClipboardHistory([]);
-    localStorage.removeItem("clipboardHistory");
-
-    // Reset the flag after a short delay
+    saveHistoryToStorage([]);
     setTimeout(() => {
       isInClearing.current = false;
     }, 2000);
   };
 
-  // Delete a specific item from history
   const deleteHistoryItem = (id: number) => {
     setClipboardHistory((prev) => {
       const filtered = prev.filter((item) => item.id !== id);
@@ -94,38 +103,15 @@ export const useClipboardHistory = () => {
     });
   };
 
-  // Save history to localStorage
-  const saveHistoryToStorage = (history: ClipboardItem[]) => {
-    try {
-      localStorage.setItem("clipboardHistory", JSON.stringify(history));
-    } catch (error) {
-      console.error("Failed to save history to storage:", error);
-    }
-  };
-
-  // Load history from localStorage
-  const loadHistoryFromStorage = () => {
-    try {
-      const stored = localStorage.getItem("clipboardHistory");
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        setClipboardHistory(parsed);
-      }
-    } catch (error) {
-      console.error("Failed to load history from storage:", error);
-    }
-  };
-
   // Initialize
   useEffect(() => {
     loadHistoryFromStorage();
     startClipboardMonitoring();
 
-    // Cleanup on unmount
     return () => {
       stopClipboardMonitoring();
     };
-  }, []); // No dependencies to prevent loops
+  }, []);
 
   return {
     clipboardHistory,

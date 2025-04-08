@@ -5,7 +5,9 @@ use tauri::Manager;
 mod auto;
 mod commands;
 use auto::auto_start::enable_autostart;
-use commands::clip_board::get_clipboard;
+use commands::clip_board::{
+    get_clipboard, load_clipboard_history, save_clipboard_history, set_clipboard,
+};
 use commands::fetch_app::{
     get_index_status, get_recent_apps, hide_window, init_app_index, open_app, search_apps,
 };
@@ -39,7 +41,10 @@ fn main() {
             open_app,
             get_index_status,
             hide_window,
-            get_clipboard
+            get_clipboard,
+            set_clipboard,
+            load_clipboard_history,
+            save_clipboard_history
         ])
         .setup(|app| {
             // Initialize app index state

@@ -128,7 +128,7 @@ function App() {
   };
 
   const handleCopyFromHistory = async (text: string) => {
-    const success = await copyToClipboard(text);
+    const success: any = await copyToClipboard(text);
     if (success) {
       // Optional: show a notification or feedback
       console.log("Copied to clipboard!");

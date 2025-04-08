@@ -14,6 +14,9 @@ export const ClipboardHistory: React.FC<ClipboardHistoryProps> = ({
   onDelete,
   onClear,
 }) => {
+  const [copyStatus, setCopyStatus] = useState<
+    "idle" | "copying" | "success" | "error"
+  >("idle");
   const [selectedIndex, setSelectedIndex] = useState<number>(
     history.length > 0 ? 0 : -1
   );
@@ -282,9 +285,28 @@ export const ClipboardHistory: React.FC<ClipboardHistoryProps> = ({
               <div className="mt-4">
                 <button
                   className="w-full py-2 px-4 bg-gray-700 hover:bg-gray-600 rounded flex items-center justify-center"
-                  onClick={() => onCopy(selectedItem.text)}
+                  onClick={async () => {
+                    setCopyStatus("copying");
+                    try {
+                      await onCopy(selectedItem.text);
+                      setCopyStatus("success");
+                      setTimeout(() => setCopyStatus("idle"), 2000);
+                    } catch (err) {
+                      setCopyStatus("error");
+                      setTimeout(() => setCopyStatus("idle"), 2000);
+                    }
+                  }}
+                  disabled={copyStatus === "copying"}
                 >
-                  <span>Copy to Clipboard</span>
+                  <span>
+                    {copyStatus === "copying"
+                      ? "Copying..."
+                      : copyStatus === "success"
+                      ? "Copied!"
+                      : copyStatus === "error"
+                      ? "Failed to copy"
+                      : "Copy to Clipboard"}
+                  </span>
                   <span className="ml-2 bg-gray-600 text-xs px-1.5 py-0.5 rounded">
                     ⌘
                   </span>
