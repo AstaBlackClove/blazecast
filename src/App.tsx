@@ -29,7 +29,7 @@ function App() {
   // Filter clipboard history based on query when in clipboard mode
   const filteredClipboardHistory =
     mode === "clipboard" && query
-      ? clipboardHistory.filter((item) =>
+      ? clipboardHistory.filter((item: any) =>
           item.text.toLowerCase().includes(query.toLowerCase())
         )
       : clipboardHistory;

@@ -172,6 +172,7 @@ export const ClipboardHistory: React.FC<ClipboardHistoryProps> = ({
     >
       <div className="flex flex-grow overflow-hidden h-full">
         <div className="w-1/3 border-r border-gray-700 bg-gray-800 flex flex-col h-full">
+          {/* //pinned section */}
           {pinnedItems.length > 0 && (
             <>
               <div className="text-xs font-bold text-gray-400 px-3 py-2 bg-gray-700">
@@ -209,6 +210,7 @@ export const ClipboardHistory: React.FC<ClipboardHistoryProps> = ({
               ))}
             </>
           )}
+          {/* //history section */}
           <div
             ref={historyRef}
             className="flex-grow overflow-y-auto"
@@ -252,7 +254,7 @@ export const ClipboardHistory: React.FC<ClipboardHistoryProps> = ({
             )}
           </div>
         </div>
-
+        {/* //selectd item section */}
         <div className="flex-grow p-3 border-l border-gray-700 bg-gray-800 overflow-y-auto">
           {selectedItem ? (
             <>
@@ -269,11 +271,15 @@ export const ClipboardHistory: React.FC<ClipboardHistoryProps> = ({
               <div className="text-sm mb-4">
                 <div className="flex justify-between mb-1">
                   <span className="text-gray-400">Times copied</span>
-                  <span>2</span>
+                  <span>{selectedItem.copy_count || 1}</span>
                 </div>
                 <div className="flex justify-between mb-1">
                   <span className="text-gray-400">Last copied</span>
-                  <span>{formatDate(selectedItem.timestamp)}</span>
+                  <span>
+                    {formatDate(
+                      selectedItem.last_copied || selectedItem.timestamp
+                    )}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-400">First copied</span>
@@ -288,7 +294,7 @@ export const ClipboardHistory: React.FC<ClipboardHistoryProps> = ({
           )}
         </div>
       </div>
-
+      {/* //footer */}
       <div className="flex-shrink-0 bg-gray-700 border-t border-gray-800 px-4 py-2 text-xs text-gray-400">
         <div className="flex justify-between items-center">
           <div>Actions</div>
@@ -310,7 +316,7 @@ export const ClipboardHistory: React.FC<ClipboardHistoryProps> = ({
           </div>
         </div>
       </div>
-
+      {/* //menu popup */}
       {showActionMenu && selectedIndex >= 0 && (
         <div
           ref={menuRef}

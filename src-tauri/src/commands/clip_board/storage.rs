@@ -18,6 +18,8 @@ pub struct ClipboardItem {
     pub text: String,
     pub timestamp: u64,
     pub pinned: bool,
+    pub last_copied: u64,
+    pub copy_count: u64,
 }
 
 // Get the path to the clipboard history file

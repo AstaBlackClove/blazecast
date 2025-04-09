@@ -6,10 +6,12 @@ export interface ClipboardItem {
   text: string;
   pinned: boolean;
   timestamp: number;
+  last_copied: number;
+  copy_count: number;
 }
 
 export const useClipboardHistory = () => {
-  const [clipboardHistory, setClipboardHistory] = useState<ClipboardItem[]>([]);
+  const [clipboardHistory, setClipboardHistory] = useState<any>([]);
   const [lastClipboardContent, setLastClipboardContent] = useState("");
   const clipboardIntervalRef = useRef<number | null>(null);
   const isInClearing = useRef(false);
@@ -38,6 +40,8 @@ export const useClipboardHistory = () => {
       const migratedItems = (parsed.items || []).map((item: any) => ({
         ...item,
         pinned: item.pinned ?? false,
+        copy_count: item.copy_count ?? 1,
+        last_copied: item.last_copied ?? item.timestamp,
       }));
       setClipboardHistory(migratedItems);
     } catch (error) {
@@ -73,7 +77,9 @@ export const useClipboardHistory = () => {
             id: Date.now(),
             text: currentContent,
             timestamp: Date.now(),
+            last_copied: Date.now(),
             pinned: false,
+            copy_count: 1,
           };
 
           const updatedHistory = [newItem, ...prev.slice(0, 99)];
@@ -137,6 +143,24 @@ export const useClipboardHistory = () => {
       currentIntervalRef.current = baseInterval;
       noChangeCountRef.current = 0;
 
+      const now = Date.now();
+
+      // Update copy count and lastCopied timestamp for this item
+      setClipboardHistory((prev: any) => {
+        const updatedHistory = prev.map((item: any) => {
+          if (item.text === text) {
+            return {
+              ...item,
+              copy_count: (item.copy_count || 0) + 1,
+              last_copied: now,
+            };
+          }
+          return item;
+        });
+        saveHistoryToStorage(updatedHistory);
+        return updatedHistory;
+      });
+
       return true;
     } catch (error) {
       console.error("Failed to copy to clipboard:", error);
@@ -163,10 +187,10 @@ export const useClipboardHistory = () => {
 
   const deleteHistoryItem = async (id: number) => {
     // Find item to be deleted
-    const itemToDelete = clipboardHistory.find((item) => item.id === id);
+    const itemToDelete = clipboardHistory.find((item: any) => item.id === id);
 
-    setClipboardHistory((prev) => {
-      const filtered = prev.filter((item) => item.id !== id);
+    setClipboardHistory((prev: any) => {
+      const filtered = prev.filter((item: any) => item.id !== id);
       saveHistoryToStorage(filtered);
       return filtered;
     });
@@ -180,11 +204,13 @@ export const useClipboardHistory = () => {
         if (currentClipboardText === itemToDelete.text) {
           // Find the next most recent item to replace with (optional)
           const remainingItems = clipboardHistory.filter(
-            (item) => item.id !== id
+            (item: any) => item.id !== id
           );
           const replacementText =
             remainingItems.length > 0
-              ? remainingItems.sort((a, b) => b.timestamp - a.timestamp)[0].text
+              ? remainingItems.sort(
+                  (a: any, b: any) => b.timestamp - a.timestamp
+                )[0].text
               : null;
 
           // Delete from system clipboard
