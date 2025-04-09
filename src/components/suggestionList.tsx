@@ -126,9 +126,17 @@ export function SuggestionList({
         <div className="flex-shrink-0 bg-gray-700 border-t border-gray-800 px-4 py-2 text-xs text-gray-400">
           <div className="flex justify-between items-center">
             <div>Actions</div>
-            <div className="flex items-center space-x-2">
-              <span className="bg-gray-800 px-2 py-1 rounded">↵</span>
-              <span>Open</span>
+            <div className="flex space-x-6">
+              <div className="flex items-center space-x-2">
+                <span className="bg-gray-800 px-2 py-1 rounded">
+                  ALT + SHFT + C
+                </span>
+                <span>Clipboard</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <span className="bg-gray-800 px-2 py-1 rounded">↵</span>
+                <span>Open</span>
+              </div>
             </div>
           </div>
         </div>

@@ -14,10 +14,8 @@ function App() {
   const [mode, setMode] = useState<"apps" | "clipboard">("apps");
   const [resetTrigger, setResetTrigger] = useState(0);
 
-  // Track if we're currently clearing the clipboard to prevent re-additions
   const isClearing = useRef(false);
 
-  // Use our clipboard hook
   const {
     clipboardHistory,
     copyToClipboard,
@@ -26,7 +24,6 @@ function App() {
     refreshClipboardHistory,
   } = useClipboardHistory();
 
-  // Filter clipboard history based on query when in clipboard mode
   const filteredClipboardHistory =
     mode === "clipboard" && query
       ? clipboardHistory.filter((item: any) =>
@@ -34,7 +31,6 @@ function App() {
         )
       : clipboardHistory;
 
-  // Load recent apps when the app starts
   const fetchRecentApps = async () => {
     try {
       const apps: AppInfo[] = await invoke("get_recent_apps");
@@ -44,7 +40,6 @@ function App() {
           await invoke("open_app", { appId: app.id });
         },
       }));
-
       setRecentApps(recentSuggestions);
     } catch (error) {
       console.error("Failed to fetch recent apps:", error);
@@ -53,19 +48,25 @@ function App() {
 
   useEffect(() => {
     fetchRecentApps();
-    // Check if user types "clip" to activate clipboard mode
-    if (query.toLowerCase() === "clip") {
-      setMode("clipboard");
-      setQuery(""); // Clear the input after switching modes
-      setResetTrigger((prev) => prev + 1);
-      invoke("resize_window", { width: 900, height: 700 });
-    }
-  }, [query]);
 
-  // Use the useSuggestions hook to fetch suggestions
+    const handleShortcut = (event: KeyboardEvent) => {
+      if (event.altKey && event.shiftKey && event.code === "KeyC") {
+        event.preventDefault();
+        setMode("clipboard");
+        setQuery(""); // clear input
+        setResetTrigger((prev) => prev + 1);
+        invoke("resize_window", { width: 900, height: 700 });
+      }
+    };
+
+    window.addEventListener("keydown", handleShortcut);
+    return () => {
+      window.removeEventListener("keydown", handleShortcut);
+    };
+  }, []);
+
   const suggestions: Suggestion[] = useSuggestions(query);
 
-  // If query is empty, show recent apps
   const displayedSuggestions = query.trim() === "" ? recentApps : suggestions;
 
   const handleQueryChange = (newQuery: string) => {
@@ -76,7 +77,6 @@ function App() {
     if (mode === "apps" && displayedSuggestions.length > 0) {
       openSelectedApp();
     } else if (mode === "clipboard" && filteredClipboardHistory.length > 0) {
-      // Copy the selected clipboard item if in clipboard mode
       handleCopyFromHistory(filteredClipboardHistory[selectedIndex].text);
     }
   };
@@ -119,21 +119,18 @@ function App() {
   };
 
   const handleEscape = () => {
-    // If in clipboard mode and query is not empty, just clear the query
     if (mode === "clipboard" && query) {
       setQuery("");
       setResetTrigger((prev) => prev + 1);
       return;
     }
 
-    // If in clipboard mode with empty query, switch back to apps mode
     if (mode === "clipboard") {
       setMode("apps");
       invoke("resize_window", { width: 750, height: 500 });
       return;
     }
 
-    // Otherwise hide the window
     invoke("hide_window");
   };
 
@@ -141,16 +138,14 @@ function App() {
     setMode("apps");
     setQuery("");
     setResetTrigger((prev) => prev + 1);
-    // Resize back to original size
     invoke("resize_window", { width: 750, height: 500 });
   };
 
-  // In both openSelectedApp and handleSuggestionClick:
   const openSelectedApp = async () => {
     const selected: any = displayedSuggestions[selectedIndex];
     if (selected?.action) {
       try {
-        await selected.action(); // wait for it
+        await selected.action();
         await invoke("hide_window");
         setQuery("");
         setResetTrigger((prev) => prev + 1);
@@ -178,27 +173,22 @@ function App() {
   const handleCopyFromHistory = async (text: string) => {
     const success: any = await copyToClipboard(text);
     if (success) {
-      // Hide window after copy
       invoke("hide_window");
     }
   };
 
-  // Wrapped clearHistory to handle the bug
   const handleClearHistory = () => {
     isClearing.current = true;
     clearHistory();
-    // Reset after a delay to prevent the immediate re-addition
     setTimeout(() => {
       isClearing.current = false;
     }, 2000);
   };
 
-  // Handler for pin success
   const handlePinSuccess = async () => {
     await refreshClipboardHistory();
   };
 
-  // Reset selectedIndex when filtering changes in clipboard mode
   useEffect(() => {
     if (mode === "clipboard") {
       setSelectedIndex(filteredClipboardHistory.length > 0 ? 0 : -1);
@@ -207,7 +197,6 @@ function App() {
 
   return (
     <div className="flex flex-col w-full h-full rounded-xl overflow-hidden border border-gray-700">
-      {/* Command input with back button when in clipboard mode */}
       <CommandInput
         query={query}
         onQueryChange={handleQueryChange}
@@ -219,8 +208,6 @@ function App() {
         showBackButton={mode === "clipboard"}
         onBackClick={handleBackToApps}
       />
-
-      {/* Allow suggestion list to grow and scroll as needed */}
       <div className="flex-grow overflow-hidden">
         {mode === "apps" ? (
           <SuggestionList
