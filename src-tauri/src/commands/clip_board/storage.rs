@@ -17,6 +17,7 @@ pub struct ClipboardItem {
     pub id: u64,
     pub text: String,
     pub timestamp: u64,
+    pub pinned: bool,
 }
 
 // Get the path to the clipboard history file
@@ -139,6 +140,27 @@ pub fn save_clipboard_history(
     // Save to file
     fs::write(&history_file, encrypted_data)
         .map_err(|e| format!("Failed to save clipboard history: {}", e))
+}
+
+#[tauri::command]
+pub fn pin_clipboard_item(item_id: u64, app_handle: tauri::AppHandle) -> Result<(), String> {
+    // Load the clipboard history
+    let history_str = load_clipboard_history(app_handle.clone())?;
+    let mut history: ClipboardHistoryFile = serde_json::from_str(&history_str)
+        .map_err(|e| format!("Failed to deserialize clipboard history: {}", e))?;
+
+    // Find the item and pin it
+    if let Some(item) = history.items.iter_mut().find(|i| i.id == item_id) {
+        item.pinned = true;
+    } else {
+        return Err("Item not found".to_string());
+    }
+
+    // Save the updated history
+    let updated_str = serde_json::to_string(&history)
+        .map_err(|e| format!("Failed to serialize updated history: {}", e))?;
+
+    save_clipboard_history(updated_str, app_handle)
 }
 
 #[tauri::command]

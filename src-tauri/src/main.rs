@@ -5,13 +5,14 @@ use tauri::Manager;
 mod auto;
 mod commands;
 use auto::auto_start::enable_autostart;
-use commands::window_resize::resize_window;
 use commands::clip_board::{
-    get_clipboard, load_clipboard_history, save_clipboard_history, set_clipboard,
+    clear_system_clipboard, delete_from_clipboard, get_clipboard, load_clipboard_history,
+    pin_clipboard_item, save_clipboard_history, set_clipboard,
 };
 use commands::fetch_app::{
     get_index_status, get_recent_apps, hide_window, init_app_index, open_app, search_apps,
 };
+use commands::window_resize::resize_window;
 
 fn main() {
     let tray_menu = tauri::SystemTrayMenu::new()
@@ -46,7 +47,10 @@ fn main() {
             set_clipboard,
             load_clipboard_history,
             save_clipboard_history,
-            resize_window
+            resize_window,
+            clear_system_clipboard,
+            delete_from_clipboard,
+            pin_clipboard_item
         ])
         .setup(|app| {
             // Initialize app index state

@@ -61,7 +61,7 @@ export function CommandInput({
   }, [onQueryChange]);
 
   return (
-    <div className="flex items-center bg-gray-700 border-b border-gray-800 px-3 py-2">
+    <div className="flex items-center bg-gray-700 px-3 py-2">
       {showBackButton && (
         <div
           className="text-gray-400 hover:text-white cursor-pointer mr-2"
@@ -84,6 +84,7 @@ export function CommandInput({
         </div>
       )}
       <input
+        id="command-input"
         autoFocus
         type="text"
         value={query}

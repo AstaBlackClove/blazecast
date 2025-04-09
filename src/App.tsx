@@ -18,8 +18,21 @@ function App() {
   const isClearing = useRef(false);
 
   // Use our clipboard hook
-  const { clipboardHistory, copyToClipboard, clearHistory, deleteHistoryItem } =
-    useClipboardHistory();
+  const {
+    clipboardHistory,
+    copyToClipboard,
+    clearHistory,
+    deleteHistoryItem,
+    refreshClipboardHistory,
+  } = useClipboardHistory();
+
+  // Filter clipboard history based on query when in clipboard mode
+  const filteredClipboardHistory =
+    mode === "clipboard" && query
+      ? clipboardHistory.filter((item) =>
+          item.text.toLowerCase().includes(query.toLowerCase())
+        )
+      : clipboardHistory;
 
   // Load recent apps when the app starts
   const fetchRecentApps = async () => {
@@ -40,16 +53,12 @@ function App() {
 
   useEffect(() => {
     fetchRecentApps();
-  }, []);
-
-  // Watch for query changes to check for "clip" command
-  useEffect(() => {
     // Check if user types "clip" to activate clipboard mode
     if (query.toLowerCase() === "clip") {
       setMode("clipboard");
       setQuery(""); // Clear the input after switching modes
       setResetTrigger((prev) => prev + 1);
-      invoke("resize_window", { width: 800, height: 600 });
+      invoke("resize_window", { width: 900, height: 700 });
     }
   }, [query]);
 
@@ -66,26 +75,61 @@ function App() {
   const handleSubmit = () => {
     if (mode === "apps" && displayedSuggestions.length > 0) {
       openSelectedApp();
+    } else if (mode === "clipboard" && filteredClipboardHistory.length > 0) {
+      // Copy the selected clipboard item if in clipboard mode
+      handleCopyFromHistory(filteredClipboardHistory[selectedIndex].text);
+    }
+  };
+
+  const scrollToClipboardItem = (index: number) => {
+    const item = document.getElementById(`clipboard-item-${index}`);
+    if (item) {
+      item.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
   };
 
   const handleArrowUp = () => {
-    setSelectedIndex((prev) =>
-      prev > 0 ? prev - 1 : displayedSuggestions.length - 1
-    );
+    if (mode === "apps") {
+      setSelectedIndex((prev) =>
+        prev > 0 ? prev - 1 : displayedSuggestions.length - 1
+      );
+    } else if (mode === "clipboard") {
+      setSelectedIndex((prev) => {
+        const newIndex =
+          prev > 0 ? prev - 1 : filteredClipboardHistory.length - 1;
+        scrollToClipboardItem(newIndex);
+        return newIndex;
+      });
+    }
   };
 
   const handleArrowDown = () => {
-    setSelectedIndex((prev) =>
-      prev < displayedSuggestions.length - 1 ? prev + 1 : 0
-    );
+    if (mode === "apps") {
+      setSelectedIndex((prev) =>
+        prev < displayedSuggestions.length - 1 ? prev + 1 : 0
+      );
+    } else if (mode === "clipboard") {
+      setSelectedIndex((prev) => {
+        const newIndex =
+          prev < filteredClipboardHistory.length - 1 ? prev + 1 : 0;
+        scrollToClipboardItem(newIndex);
+        return newIndex;
+      });
+    }
   };
 
   const handleEscape = () => {
-    // If in clipboard mode, switch back to apps mode
+    // If in clipboard mode and query is not empty, just clear the query
+    if (mode === "clipboard" && query) {
+      setQuery("");
+      setResetTrigger((prev) => prev + 1);
+      return;
+    }
+
+    // If in clipboard mode with empty query, switch back to apps mode
     if (mode === "clipboard") {
       setMode("apps");
-      invoke("resize_window", { width: 600, height: 400 });
+      invoke("resize_window", { width: 750, height: 500 });
       return;
     }
 
@@ -98,7 +142,7 @@ function App() {
     setQuery("");
     setResetTrigger((prev) => prev + 1);
     // Resize back to original size
-    invoke("resize_window", { width: 600, height: 400 });
+    invoke("resize_window", { width: 750, height: 500 });
   };
 
   // In both openSelectedApp and handleSuggestionClick:
@@ -134,8 +178,6 @@ function App() {
   const handleCopyFromHistory = async (text: string) => {
     const success: any = await copyToClipboard(text);
     if (success) {
-      // Optional: show a notification or feedback
-      console.log("Copied to clipboard!");
       // Hide window after copy
       invoke("hide_window");
     }
@@ -150,6 +192,18 @@ function App() {
       isClearing.current = false;
     }, 2000);
   };
+
+  // Handler for pin success
+  const handlePinSuccess = async () => {
+    await refreshClipboardHistory();
+  };
+
+  // Reset selectedIndex when filtering changes in clipboard mode
+  useEffect(() => {
+    if (mode === "clipboard") {
+      setSelectedIndex(filteredClipboardHistory.length > 0 ? 0 : -1);
+    }
+  }, [query, mode, filteredClipboardHistory.length]);
 
   return (
     <div className="flex flex-col w-full h-full rounded-xl overflow-hidden border border-gray-700">
@@ -176,10 +230,13 @@ function App() {
           />
         ) : (
           <ClipboardHistory
-            history={clipboardHistory}
+            history={filteredClipboardHistory}
             onCopy={handleCopyFromHistory}
             onDelete={deleteHistoryItem}
             onClear={handleClearHistory}
+            selectedIndex={selectedIndex}
+            setSelectedIndex={setSelectedIndex}
+            onPinSuccess={handlePinSuccess}
           />
         )}
       </div>
