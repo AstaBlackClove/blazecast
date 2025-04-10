@@ -17,6 +17,29 @@ export function useSuggestions(query: string): Suggestion[] {
         return;
       }
 
+      // Check for quick link creation keywords
+      const quickLinkKeywords = [
+        "create",
+        "add",
+        "new",
+        "link",
+        "quicklink",
+        "quick link",
+      ];
+      const shouldShowQuickLink = quickLinkKeywords.some((keyword) =>
+        trimmedQuery.toLowerCase().includes(keyword)
+      );
+
+      if (shouldShowQuickLink) {
+        results.push({
+          id: ActionType.CREATE_QUICK_LINK,
+          title: "Create Quick Link",
+          subtitle: "Create a new quick link to a website or application",
+          category: "Actions",
+          icon: "🔗", // You can use a custom icon here
+        });
+      }
+
       // Fetch app results first
       try {
         const appResults: AppInfo[] = await invoke("search_apps", {
@@ -40,6 +63,32 @@ export function useSuggestions(query: string): Suggestion[] {
         });
       } catch (error) {
         console.error("Failed to fetch app suggestions:", error);
+      }
+
+      // Fetch saved quick links
+      try {
+        const quickLinks: any[] = await invoke("get_quick_links");
+        quickLinks.forEach((link) => {
+          results.push({
+            id: link.id,
+            title: link.name,
+            subtitle: link.description || link.command,
+            category: "Quick Links",
+            icon: link.icon || "🔗",
+            action: async () => {
+              try {
+                await invoke("execute_quick_link", { quickLinkId: link.id });
+              } catch (error) {
+                console.error(
+                  `Failed to execute quick link ${link.name}:`,
+                  error
+                );
+              }
+            },
+          });
+        });
+      } catch (error) {
+        console.error("Failed to fetch quick links:", error);
       }
 
       // Always add search actions at the bottom

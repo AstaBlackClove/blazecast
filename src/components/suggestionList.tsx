@@ -7,6 +7,7 @@ type Props = {
   suggestions: Suggestion[];
   selectedIndex: number;
   onSuggestionClick: (suggestion: Suggestion) => void;
+  onDeleteQuickLink?: () => void;
 };
 
 type IndexStatus = {
@@ -17,6 +18,7 @@ export function SuggestionList({
   suggestions,
   selectedIndex,
   onSuggestionClick,
+  onDeleteQuickLink,
 }: Props) {
   const [isIndexBuilding, setIsIndexBuilding] = useState(false);
 
@@ -39,6 +41,33 @@ export function SuggestionList({
 
     checkIndexStatus();
   }, []);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.shiftKey && e.key.toLowerCase() === "d") {
+        if (isSelectedQuickLink()) {
+          e.preventDefault();
+
+          const selectedSuggestion = suggestions[selectedIndex];
+          if (selectedSuggestion) {
+            invoke("delete_quick_link", { quickLinkId: selectedSuggestion.id })
+              .then(() => {
+                console.log("Quick link deleted!");
+                if (onDeleteQuickLink) {
+                  onDeleteQuickLink();
+                }
+              })
+              .catch((error) => {
+                console.error("Failed to delete quick link:", error);
+              });
+          }
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [suggestions, selectedIndex]);
 
   // Group suggestions by category
   const groupedSuggestions = suggestions.reduce<Record<string, Suggestion[]>>(
@@ -76,6 +105,11 @@ export function SuggestionList({
       </div>
     );
   }
+
+  const isSelectedQuickLink = () => {
+    const selectedSuggestion = suggestions[selectedIndex];
+    return selectedSuggestion?.category === "Quick Links";
+  };
 
   return (
     <div className="flex flex-col h-full bg-gray-800">
@@ -126,17 +160,25 @@ export function SuggestionList({
         <div className="flex-shrink-0 bg-gray-700 border-t border-gray-800 px-4 py-2 text-xs text-gray-400">
           <div className="flex justify-between items-center">
             <div>Actions</div>
-            <div className="flex space-x-6">
+            <div className="flex space-x-3">
+              <div className="flex items-center space-x-2">
+                <span className="bg-gray-800 px-2 py-1 rounded">↵</span>
+                <span>Open</span>
+              </div>
               <div className="flex items-center space-x-2">
                 <span className="bg-gray-800 px-2 py-1 rounded">
                   ALT + SHFT + C
                 </span>
                 <span>Clipboard</span>
               </div>
-              <div className="flex items-center space-x-2">
-                <span className="bg-gray-800 px-2 py-1 rounded">↵</span>
-                <span>Open</span>
-              </div>
+              {isSelectedQuickLink() && (
+                <div className="flex items-center space-x-2">
+                  <span className="bg-gray-800 px-2 py-1 rounded">
+                    SHFT + D
+                  </span>
+                  <span>Delete Quick Link</span>
+                </div>
+              )}
             </div>
           </div>
         </div>

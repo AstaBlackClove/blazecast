@@ -2,17 +2,29 @@ import { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/tauri";
 import { CommandInput } from "./components/commandInput";
 import { SuggestionList } from "./components/suggestionList";
-import { AppInfo, appToSuggestion, Suggestion } from "./types";
+import { AppInfo, appToSuggestion, Suggestion, QuickLink } from "./types";
 import { useSuggestions } from "./hooks/useSuggestion";
 import { useClipboardHistory } from "./hooks/useClipboard";
 import { ClipboardHistory } from "./components/clipBoard/clipBoardHistory";
+import { QuickLinkCreator } from "./components/quickLink/quickLinkCreator";
+import { QuickLinkQueryExecutor } from "./components/quickLink/quickLinkQueryExe";
 
 function App() {
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [recentApps, setRecentApps] = useState<Suggestion[]>([]);
-  const [mode, setMode] = useState<"apps" | "clipboard">("apps");
+  const [mode, setMode] = useState<"apps" | "clipboard" | "create_quick_link">(
+    "apps"
+  );
   const [resetTrigger, setResetTrigger] = useState(0);
+
+  // Quick link states - keep popup version for backward compatibility
+  const [isQuickLinkCreatorOpen, setIsQuickLinkCreatorOpen] = useState(false);
+  const [quickLinkQueryData, setQuickLinkQueryData] = useState<{
+    id: string;
+    name: string;
+    command: string;
+  } | null>(null);
 
   const isClearing = useRef(false);
 
@@ -46,8 +58,41 @@ function App() {
     }
   };
 
+  // Fetch quick links for recents
+  const fetchRecentQuickLinks = async () => {
+    try {
+      const quickLinks: QuickLink[] = await invoke("get_recent_quick_links");
+      const quickLinkSuggestions = quickLinks.map((quickLink) => ({
+        id: `${quickLink.id}`,
+        title: quickLink.name,
+        subtitle: quickLink.description || quickLink.command,
+        icon: quickLink.icon,
+        category: "Quick Links",
+        action: async () => {
+          // If command contains {query}, we need to ask for the query value
+          if (quickLink.command.includes("{query}")) {
+            setQuickLinkQueryData({
+              id: quickLink.id,
+              name: quickLink.name,
+              command: quickLink.command,
+            });
+          } else {
+            // Execute command directly
+            await invoke("execute_quick_link", { quickLinkId: quickLink.id });
+          }
+        },
+      }));
+
+      // Combine quick links with app suggestions in recent items
+      setRecentApps((prevApps) => [...quickLinkSuggestions, ...prevApps]);
+    } catch (error) {
+      console.error("Failed to fetch recent quick links:", error);
+    }
+  };
+
   useEffect(() => {
     fetchRecentApps();
+    fetchRecentQuickLinks();
 
     const handleShortcut = (event: KeyboardEvent) => {
       if (event.altKey && event.shiftKey && event.code === "KeyC") {
@@ -66,6 +111,30 @@ function App() {
   }, []);
 
   const suggestions: Suggestion[] = useSuggestions(query);
+
+  // Handle action for creating quick links
+  useEffect(() => {
+    const quickLinkCreator = suggestions.find(
+      (s) => s.id === "create_quick_link"
+    );
+    if (
+      quickLinkCreator &&
+      selectedIndex === suggestions.indexOf(quickLinkCreator)
+    ) {
+      const handleCreateQuickLink = (e: KeyboardEvent) => {
+        if (e.key === "Enter") {
+          // Use integrated quick link creator instead of popup
+          setMode("create_quick_link");
+          invoke("resize_window", { width: 750, height: 650 });
+        }
+      };
+
+      window.addEventListener("keydown", handleCreateQuickLink);
+      return () => {
+        window.removeEventListener("keydown", handleCreateQuickLink);
+      };
+    }
+  }, [suggestions, selectedIndex]);
 
   const displayedSuggestions = query.trim() === "" ? recentApps : suggestions;
 
@@ -119,6 +188,22 @@ function App() {
   };
 
   const handleEscape = () => {
+    if (isQuickLinkCreatorOpen) {
+      setIsQuickLinkCreatorOpen(false);
+      return;
+    }
+
+    if (quickLinkQueryData) {
+      setQuickLinkQueryData(null);
+      return;
+    }
+
+    if (mode === "create_quick_link") {
+      setMode("apps");
+      invoke("resize_window", { width: 750, height: 500 });
+      return;
+    }
+
     if (mode === "clipboard" && query) {
       setQuery("");
       setResetTrigger((prev) => prev + 1);
@@ -146,10 +231,21 @@ function App() {
     if (selected?.action) {
       try {
         await selected.action();
+
+        // Don't hide window if opening quick link creator or query input
+        if (
+          selected.id === "create_quick_link" ||
+          (selected.id.startsWith("execute_quick_link") &&
+            selected?.command?.includes("{query}"))
+        ) {
+          return;
+        }
+
         await invoke("hide_window");
         setQuery("");
         setResetTrigger((prev) => prev + 1);
         await fetchRecentApps();
+        await fetchRecentQuickLinks();
       } catch (error) {
         console.error(error);
       }
@@ -161,10 +257,20 @@ function App() {
       suggestion
         .action()
         .then(async () => {
+          // Don't hide window if opening quick link creator or query input
+          if (
+            suggestion.id === "create_quick_link" ||
+            (suggestion.id.startsWith("execute_quick_link") &&
+              suggestion?.command?.includes("{query}"))
+          ) {
+            return;
+          }
+
           invoke("hide_window");
           setQuery("");
           setResetTrigger((prev) => prev + 1);
           await fetchRecentApps();
+          await fetchRecentQuickLinks();
         })
         .catch(console.error);
     }
@@ -189,33 +295,77 @@ function App() {
     await refreshClipboardHistory();
   };
 
+  const handleQuickLinkSave = async () => {
+    setMode("apps");
+    setQuery("");
+    setResetTrigger((prev) => prev + 1);
+    await fetchRecentQuickLinks();
+    invoke("resize_window", { width: 750, height: 500 });
+  };
+
+  const executeQuickLinkWithQuery = async (finalCommand: string) => {
+    if (!quickLinkQueryData) return;
+
+    await invoke("execute_quick_link_with_command", {
+      quickLinkId: quickLinkQueryData.id,
+      command: finalCommand,
+    });
+
+    setQuickLinkQueryData(null);
+    await invoke("hide_window");
+    setQuery("");
+    setResetTrigger((prev) => prev + 1);
+  };
+
   useEffect(() => {
     if (mode === "clipboard") {
       setSelectedIndex(filteredClipboardHistory.length > 0 ? 0 : -1);
     }
   }, [query, mode, filteredClipboardHistory.length]);
 
+  const refreshSuggestions = async () => {
+    setSelectedIndex(0);
+
+    if (query.trim() === "") {
+      // If user is browsing recents → clear and fetch again
+      setRecentApps([]);
+      await fetchRecentApps();
+      await fetchRecentQuickLinks();
+    } else {
+      // Always refresh recents after delete too
+      setRecentApps([]);
+      await fetchRecentApps();
+      await fetchRecentQuickLinks();
+
+      // Then refresh search view
+      setQuery((prev) => prev + " ");
+    }
+  };
+
   return (
     <div className="flex flex-col w-full h-full rounded-xl overflow-hidden border border-gray-700">
-      <CommandInput
-        query={query}
-        onQueryChange={handleQueryChange}
-        onSubmit={handleSubmit}
-        onArrowUp={handleArrowUp}
-        onArrowDown={handleArrowDown}
-        onEscape={handleEscape}
-        resetTrigger={resetTrigger}
-        showBackButton={mode === "clipboard"}
-        onBackClick={handleBackToApps}
-      />
+      {mode !== "create_quick_link" && (
+        <CommandInput
+          query={query}
+          onQueryChange={handleQueryChange}
+          onSubmit={handleSubmit}
+          onArrowUp={handleArrowUp}
+          onArrowDown={handleArrowDown}
+          onEscape={handleEscape}
+          resetTrigger={resetTrigger}
+          showBackButton={mode === "clipboard"}
+          onBackClick={handleBackToApps}
+        />
+      )}
       <div className="flex-grow overflow-hidden">
         {mode === "apps" ? (
           <SuggestionList
             suggestions={displayedSuggestions}
             selectedIndex={selectedIndex}
             onSuggestionClick={handleSuggestionClick}
+            onDeleteQuickLink={refreshSuggestions}
           />
-        ) : (
+        ) : mode === "clipboard" ? (
           <ClipboardHistory
             history={filteredClipboardHistory}
             onCopy={handleCopyFromHistory}
@@ -225,8 +375,24 @@ function App() {
             setSelectedIndex={setSelectedIndex}
             onPinSuccess={handlePinSuccess}
           />
-        )}
+        ) : mode === "create_quick_link" ? (
+          <QuickLinkCreator
+            onClose={handleBackToApps}
+            onSave={handleQuickLinkSave}
+          />
+        ) : null}
       </div>
+
+      {/* Quick Link Query Executor Modal */}
+      {quickLinkQueryData && (
+        <QuickLinkQueryExecutor
+          quickLinkId={quickLinkQueryData.id}
+          quickLinkName={quickLinkQueryData.name}
+          commandTemplate={quickLinkQueryData.command}
+          onClose={() => setQuickLinkQueryData(null)}
+          onExecute={executeQuickLinkWithQuery}
+        />
+      )}
     </div>
   );
 }

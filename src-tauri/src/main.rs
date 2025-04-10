@@ -12,6 +12,10 @@ use commands::clip_board::{
 use commands::fetch_app::{
     get_index_status, get_recent_apps, hide_window, init_app_index, open_app, search_apps,
 };
+use commands::quick_link::{
+    delete_quick_link, execute_quick_link, execute_quick_link_with_command, get_quick_links,
+    get_recent_quick_links, save_quick_link,
+};
 use commands::window_resize::resize_window;
 
 fn main() {
@@ -50,9 +54,17 @@ fn main() {
             resize_window,
             clear_system_clipboard,
             delete_from_clipboard,
-            pin_clipboard_item
+            pin_clipboard_item,
+            get_quick_links,
+            get_recent_quick_links,
+            save_quick_link,
+            execute_quick_link,
+            execute_quick_link_with_command,
+            delete_quick_link
         ])
         .setup(|app| {
+            // Initialize quick links
+            commands::quick_link::init(app)?;
             // Initialize app index state
             let app_index_state = init_app_index();
 
