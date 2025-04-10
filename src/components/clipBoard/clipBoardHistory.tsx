@@ -22,6 +22,7 @@ export const ClipboardHistory: React.FC<ClipboardHistoryProps> = ({
   onPinSuccess,
 }) => {
   const pinnedItems = history.filter((item) => item.pinned);
+  console.log(history);
   const [showActionMenu, setShowActionMenu] = useState<boolean>(false);
   const [menuSelectedIndex, setMenuSelectedIndex] = useState<number>(0);
   const historyRef = useRef<HTMLDivElement>(null);
@@ -44,11 +45,37 @@ export const ClipboardHistory: React.FC<ClipboardHistoryProps> = ({
 
   const formatDate = (timestamp: number) => {
     const date = new Date(timestamp);
-    return `Today at ${date.toLocaleTimeString([], {
+    const today = new Date();
+
+    // Check if the date is today
+    const isToday =
+      date.getDate() === today.getDate() &&
+      date.getMonth() === today.getMonth() &&
+      date.getFullYear() === today.getFullYear();
+
+    // Check if the date is yesterday
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
+    const isYesterday =
+      date.getDate() === yesterday.getDate() &&
+      date.getMonth() === yesterday.getMonth() &&
+      date.getFullYear() === yesterday.getFullYear();
+
+    // Format the time part
+    const timeString = date.toLocaleTimeString([], {
       hour: "2-digit",
       minute: "2-digit",
       second: "2-digit",
-    })}`;
+    });
+
+    if (isToday) {
+      return `Today at ${timeString}`;
+    } else if (isYesterday) {
+      return `Yesterday at ${timeString}`;
+    } else {
+      // For dates older than yesterday, just show the date (no "at time")
+      return date.toLocaleDateString();
+    }
   };
 
   // Close menu when clicking outside
