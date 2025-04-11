@@ -3,6 +3,10 @@
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Windows](https://img.shields.io/badge/OS-Windows-blue)]()
 
+<div align="center">
+  <img src="assets/blazecast-logo.png" alt="BlazeCast Logo" width="200">
+</div>
+
 BlazeCast is a blazing fast productivity tool for Windows your shortcut to everything.  
 Inspired by Raycast, built for Windows users who want speed, simplicity, and power at their fingertips.
 
