@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/tauri";
 import { CommandInput } from "./components/commandInput";
 import { SuggestionList } from "./components/suggestionList";
-import { AppInfo, appToSuggestion, Suggestion, QuickLink } from "./types";
+import { AppInfo, appToSuggestion, Suggestion } from "./types";
 import { useSuggestions } from "./hooks/useSuggestion";
 import { useClipboardHistory } from "./hooks/useClipboard";
 import { ClipboardHistory } from "./components/clipBoard/clipBoardHistory";
@@ -12,7 +12,7 @@ import { QuickLinkQueryExecutor } from "./components/quickLink/quickLinkQueryExe
 function App() {
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
-  const [recentApps, setRecentApps] = useState<Suggestion[]>([]);
+  const [recentApps, setRecentApps] = useState<any>([]);
   const [mode, setMode] = useState<"apps" | "clipboard" | "create_quick_link">(
     "apps"
   );
@@ -50,6 +50,7 @@ function App() {
         ...appToSuggestion(app),
         action: async () => {
           await invoke("open_app", { appId: app.id });
+          return false; // No modal opened
         },
       }));
       setRecentApps(recentSuggestions);
@@ -59,46 +60,49 @@ function App() {
   };
 
   // Fetch quick links for recents
-  const fetchRecentQuickLinks = async () => {
-    try {
-      const quickLinks: QuickLink[] = await invoke("get_recent_quick_links");
-      const quickLinkSuggestions = quickLinks.map((quickLink) => ({
-        id: `${quickLink.id}`,
-        title: quickLink.name,
-        subtitle: quickLink.description || quickLink.command,
-        icon: quickLink.icon,
-        category: "Quick Links",
-        action: async () => {
-          // If command contains {query}, we need to ask for the query value
-          if (quickLink.command.includes("{query}")) {
-            setQuickLinkQueryData({
-              id: quickLink.id,
-              name: quickLink.name,
-              command: quickLink.command,
-            });
-          } else {
-            // Execute command directly
-            await invoke("execute_quick_link", { quickLinkId: quickLink.id });
-          }
-        },
-      }));
+  // const fetchRecentQuickLinks = async () => {
+  //   try {
+  //     const quickLinks: QuickLink[] = await invoke("get_recent_quick_links");
+  //     const quickLinkSuggestions = quickLinks.map((quickLink) => ({
+  //       id: `${quickLink.id}`,
+  //       title: quickLink.name,
+  //       subtitle: quickLink.description || quickLink.command,
+  //       icon: quickLink.icon,
+  //       category: "Quick Links",
+  //       hasQueryParam: quickLink.command.includes("{query}"), // Add this flag to track query params
+  //       action: async () => {
+  //         // If command contains {query}, we need to ask for the query value
+  //         if (quickLink.command.includes("{query}")) {
+  //           setQuickLinkQueryData({
+  //             id: quickLink.id,
+  //             name: quickLink.name,
+  //             command: quickLink.command,
+  //           });
+  //           return true; // Return true to indicate we're showing a modal
+  //         } else {
+  //           // Execute command directly
+  //           await invoke("execute_quick_link", { quickLinkId: quickLink.id });
+  //           return false; // Return false to indicate no modal is shown
+  //         }
+  //       },
+  //     }));
 
-      // Combine quick links with app suggestions in recent items
-      setRecentApps((prevApps) => [...quickLinkSuggestions, ...prevApps]);
-    } catch (error) {
-      console.error("Failed to fetch recent quick links:", error);
-    }
-  };
+  //     // Combine quick links with app suggestions in recent items
+  //     setRecentApps((prevApps: any) => [...quickLinkSuggestions, ...prevApps]);
+  //   } catch (error) {
+  //     console.error("Failed to fetch recent quick links:", error);
+  //   }
+  // };
 
   useEffect(() => {
     fetchRecentApps();
-    fetchRecentQuickLinks();
+    // fetchRecentQuickLinks();
 
     const handleShortcut = (event: KeyboardEvent) => {
       if (event.altKey && event.shiftKey && event.code === "KeyC") {
         event.preventDefault();
         setMode("clipboard");
-        setQuery(""); // clear input
+        setQuery("");
         setResetTrigger((prev) => prev + 1);
         invoke("resize_window", { width: 900, height: 700 });
       }
@@ -110,7 +114,36 @@ function App() {
     };
   }, []);
 
-  const suggestions: Suggestion[] = useSuggestions(query);
+  // Intercept search suggestions and enhance their action handlers
+  const rawSuggestions: Suggestion[] = useSuggestions(query);
+
+  // Process suggestions to add proper action handling for quick links in search results
+  const suggestions = rawSuggestions.map((suggestion) => {
+    // If this is a quick link from search results, ensure it has the right action handler
+    if (suggestion.category === "Quick Links") {
+      return {
+        ...suggestion,
+        action: async () => {
+          // Extract the command from the subtitle if available
+          const command = suggestion.subtitle || "";
+
+          if (command.includes("{query}")) {
+            setQuickLinkQueryData({
+              id: suggestion.id,
+              name: suggestion.title,
+              command: command,
+            });
+            return true; // Return true to indicate we're showing a modal
+          } else {
+            // Execute directly using the ID
+            await invoke("execute_quick_link", { quickLinkId: suggestion.id });
+            return false; // No modal opened
+          }
+        },
+      };
+    }
+    return suggestion;
+  });
 
   // Handle action for creating quick links
   useEffect(() => {
@@ -136,7 +169,8 @@ function App() {
     }
   }, [suggestions, selectedIndex]);
 
-  const displayedSuggestions = query.trim() === "" ? recentApps : suggestions;
+  const displayedSuggestions: any =
+    query.trim() === "" ? recentApps : suggestions;
 
   const handleQueryChange = (newQuery: string) => {
     setQuery(newQuery);
@@ -227,57 +261,48 @@ function App() {
   };
 
   const openSelectedApp = async () => {
-    const selected: any = displayedSuggestions[selectedIndex];
+    const selected = displayedSuggestions[selectedIndex];
     if (selected?.action) {
       try {
-        await selected.action();
+        // Execute the action and check if it opens a modal
+        const opensModal = await selected.action();
 
-        // Don't hide window if opening quick link creator or query input
-        if (
-          selected.id === "create_quick_link" ||
-          (selected.id.startsWith("execute_quick_link") &&
-            selected?.command?.includes("{query}"))
-        ) {
-          return;
+        // Only hide window if not opening a modal
+        if (!opensModal) {
+          await invoke("hide_window");
+          setQuery("");
+          setResetTrigger((prev) => prev + 1);
+          await fetchRecentApps();
+          // await fetchRecentQuickLinks();
         }
-
-        await invoke("hide_window");
-        setQuery("");
-        setResetTrigger((prev) => prev + 1);
-        await fetchRecentApps();
-        await fetchRecentQuickLinks();
       } catch (error) {
         console.error(error);
       }
     }
   };
 
-  const handleSuggestionClick = (suggestion: any) => {
+  const handleSuggestionClick = async (suggestion: any) => {
     if (suggestion?.action) {
-      suggestion
-        .action()
-        .then(async () => {
-          // Don't hide window if opening quick link creator or query input
-          if (
-            suggestion.id === "create_quick_link" ||
-            (suggestion.id.startsWith("execute_quick_link") &&
-              suggestion?.command?.includes("{query}"))
-          ) {
-            return;
-          }
+      try {
+        // Execute the action and check if it opens a modal
+        const opensModal = await suggestion.action();
 
-          invoke("hide_window");
+        // Only hide window if not opening a modal
+        if (!opensModal) {
+          await invoke("hide_window");
           setQuery("");
           setResetTrigger((prev) => prev + 1);
           await fetchRecentApps();
-          await fetchRecentQuickLinks();
-        })
-        .catch(console.error);
+          // await fetchRecentQuickLinks();
+        }
+      } catch (error) {
+        console.error(error);
+      }
     }
   };
 
   const handleCopyFromHistory = async (text: string) => {
-    const success: any = await copyToClipboard(text);
+    const success = await copyToClipboard(text);
     if (success) {
       invoke("hide_window");
     }
@@ -299,7 +324,7 @@ function App() {
     setMode("apps");
     setQuery("");
     setResetTrigger((prev) => prev + 1);
-    await fetchRecentQuickLinks();
+    // await fetchRecentQuickLinks();
     invoke("resize_window", { width: 750, height: 500 });
   };
 
@@ -330,12 +355,12 @@ function App() {
       // If user is browsing recents → clear and fetch again
       setRecentApps([]);
       await fetchRecentApps();
-      await fetchRecentQuickLinks();
+      // await fetchRecentQuickLinks();
     } else {
       // Always refresh recents after delete too
       setRecentApps([]);
       await fetchRecentApps();
-      await fetchRecentQuickLinks();
+      // await fetchRecentQuickLinks();
 
       // Then refresh search view
       setQuery((prev) => prev + " ");

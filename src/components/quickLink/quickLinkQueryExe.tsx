@@ -9,8 +9,8 @@ interface QuickLinkExecutorProps {
 }
 
 export function QuickLinkQueryExecutor({
-//   quickLinkId,
-  quickLinkName,
+  //   quickLinkId,
+  // quickLinkName,
   commandTemplate,
   onClose,
   onExecute,
@@ -52,15 +52,27 @@ export function QuickLinkQueryExecutor({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
-      <div className="bg-gray-800 rounded-lg w-full max-w-md p-6 shadow-xl">
-        <div className="flex justify-between items-center mb-4">
+      <div
+        className="bg-gray-800 rounded-lg w-full max-w-md p-6 shadow-xl"
+        onKeyDown={(e) => {
+          if (e.key === "Escape") {
+            e.preventDefault();
+            onClose();
+            const commandInput = document.getElementById("command-input");
+            if (commandInput) {
+              (commandInput as HTMLInputElement).focus();
+            }
+          }
+        }}
+      >
+        {/* <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-semibold text-white">
             Execute {quickLinkName}
           </h2>
           <button onClick={onClose} className="text-gray-400 hover:text-white">
             ✕
           </button>
-        </div>
+        </div> */}
 
         {error && (
           <div className="bg-red-500 bg-opacity-20 border border-red-500 text-red-300 px-4 py-2 rounded mb-4">
@@ -72,7 +84,7 @@ export function QuickLinkQueryExecutor({
           <div>
             <label
               htmlFor="quick-link-query-input"
-              className="block text-sm text-gray-400 mb-1"
+              className="block text-sm text-gray-400 mb-2"
             >
               Enter value for {"{query}"}
             </label>
@@ -95,7 +107,7 @@ export function QuickLinkQueryExecutor({
             </div>
           </div>
 
-          <div className="flex justify-end space-x-3 pt-2">
+          {/* <div className="flex justify-end space-x-3 pt-2">
             <button
               type="button"
               onClick={onClose}
@@ -109,7 +121,7 @@ export function QuickLinkQueryExecutor({
             >
               Execute
             </button>
-          </div>
+          </div> */}
         </form>
       </div>
     </div>

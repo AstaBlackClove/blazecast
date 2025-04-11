@@ -12,11 +12,11 @@ use commands::clip_board::{
 use commands::fetch_app::{
     get_index_status, get_recent_apps, hide_window, init_app_index, open_app, search_apps,
 };
+use commands::window_resize::resize_window;
 use commands::quick_link::{
     delete_quick_link, execute_quick_link, execute_quick_link_with_command, get_quick_links,
     get_recent_quick_links, save_quick_link,
 };
-use commands::window_resize::resize_window;
 
 fn main() {
     let tray_menu = tauri::SystemTrayMenu::new()
