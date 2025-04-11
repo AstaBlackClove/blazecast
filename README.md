@@ -4,7 +4,7 @@
 [![Windows](https://img.shields.io/badge/OS-Windows-blue)]()
 
 <div align="center">
-  <img src="assets/blazecastlogo.png" alt="BlazeCast Logo" width="200">
+  <img src="src-tauri/icons/icon.ico" alt="BlazeCast Logo" width="200">
 </div>
 
 BlazeCast is a blazing fast productivity tool for Windows your shortcut to everything.  
