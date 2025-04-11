@@ -22,7 +22,6 @@ export const ClipboardHistory: React.FC<ClipboardHistoryProps> = ({
   onPinSuccess,
 }) => {
   const pinnedItems = history.filter((item) => item.pinned);
-  console.log(history);
   const [showActionMenu, setShowActionMenu] = useState<boolean>(false);
   const [menuSelectedIndex, setMenuSelectedIndex] = useState<number>(0);
   const historyRef = useRef<HTMLDivElement>(null);
@@ -32,6 +31,7 @@ export const ClipboardHistory: React.FC<ClipboardHistoryProps> = ({
   const pinItem = async (id: number) => {
     try {
       await invoke("pin_clipboard_item", { itemId: id });
+      onPinSuccess();
     } catch (error) {
       console.error("❌ Failed to pin item:", error);
     }
@@ -104,6 +104,39 @@ export const ClipboardHistory: React.FC<ClipboardHistoryProps> = ({
         }
       }
 
+      // SHIFT+P to pin/unpin
+      if (e.shiftKey && e.key.toLowerCase() === "p" && selectedIndex >= 0) {
+        e.preventDefault();
+        const selectedItem = history[selectedIndex];
+        if (selectedItem) {
+          if (selectedItem.pinned) {
+            pinItem(selectedItem.id);
+          } else if (pinnedItems.length < 3) {
+            pinItem(selectedItem.id);
+          }
+        }
+      }
+
+      // SHIFT+D to delete
+      if (
+        e.shiftKey &&
+        !e.altKey &&
+        e.key.toLowerCase() === "d" &&
+        selectedIndex >= 0
+      ) {
+        e.preventDefault();
+        const selectedItem = history[selectedIndex];
+        if (selectedItem) {
+          onDelete(selectedItem.id);
+        }
+      }
+
+      // ALT+SHIFT+D to delete all
+      if (e.altKey && e.shiftKey && e.key.toLowerCase() === "d") {
+        e.preventDefault();
+        onClear();
+      }
+
       // ALT + number to copy pinned items (1-9)
       if (e.altKey && !e.ctrlKey && !e.shiftKey) {
         const numKey = parseInt(e.key);
@@ -121,7 +154,7 @@ export const ClipboardHistory: React.FC<ClipboardHistoryProps> = ({
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [pinnedItems, selectedIndex, onCopy]);
+  }, [pinnedItems, selectedIndex, history, onCopy, onDelete, onClear]);
 
   // Focus the menu when it opens
   useEffect(() => {
@@ -142,16 +175,22 @@ export const ClipboardHistory: React.FC<ClipboardHistoryProps> = ({
   };
 
   const handleMenuSelect = (index: number) => {
+    const selectedItem = history[selectedIndex];
+    if (!selectedItem) return;
+
     switch (index) {
       case 0:
-        onCopy(history[selectedIndex].text);
+        onCopy(selectedItem.text);
         break;
       case 1:
-        onDelete(history[selectedIndex].id);
+        onDelete(selectedItem.id);
         break;
       case 2:
-        pinItem(history[selectedIndex].id);
-        onPinSuccess();
+        if (selectedItem.pinned) {
+          pinItem(selectedItem.id);
+        } else {
+          pinItem(selectedItem.id);
+        }
         break;
       case 3:
         onClear();
@@ -331,12 +370,20 @@ export const ClipboardHistory: React.FC<ClipboardHistoryProps> = ({
               <span>Copy</span>
             </div>
             <div className="flex items-center space-x-2">
-              <span className="bg-gray-800 px-2 py-1 rounded">CTRL + K</span>
+              <span className="bg-gray-800 px-2 py-1 rounded">SHIFT+P</span>
+              <span>Pin/Unpin</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <span className="bg-gray-800 px-2 py-1 rounded">SHIFT+D</span>
+              <span>Delete</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <span className="bg-gray-800 px-2 py-1 rounded">CTRL+K</span>
               <span>Menu</span>
             </div>
             {pinnedItems.length > 0 && (
               <div className="flex items-center space-x-2">
-                <span className="bg-gray-800 px-2 py-1 rounded">ALT + 1-9</span>
+                <span className="bg-gray-800 px-2 py-1 rounded">ALT+1-9</span>
                 <span>Copy Pinned</span>
               </div>
             )}
@@ -349,7 +396,7 @@ export const ClipboardHistory: React.FC<ClipboardHistoryProps> = ({
           ref={menuRef}
           tabIndex={0}
           className="fixed bg-gray-800 border border-gray-700 rounded shadow-lg z-10 focus:outline-none"
-          style={{ bottom: "60px", right: "20px", width: "180px" }}
+          style={{ bottom: "60px", right: "20px", width: "250px" }}
           onKeyDown={(e) => {
             if (e.key === "Escape") {
               e.preventDefault();
@@ -372,7 +419,7 @@ export const ClipboardHistory: React.FC<ClipboardHistoryProps> = ({
         >
           <div className="p-1">
             <button
-              className={`w-full text-left px-3 py-1.5 rounded flex items-center ${
+              className={`w-full text-left px-3 py-1.5 rounded flex justify-between items-center ${
                 menuSelectedIndex === 0 ? "bg-gray-700" : "hover:bg-gray-700"
               }`}
               onClick={() => {
@@ -380,11 +427,16 @@ export const ClipboardHistory: React.FC<ClipboardHistoryProps> = ({
                 setShowActionMenu(false);
               }}
             >
-              <span className="mr-2">📋</span>
-              <span>Copy</span>
+              <div className="flex items-center">
+                <span className="mr-2">📋</span>
+                <span>Copy</span>
+              </div>
+              <span className="text-xs bg-gray-900 px-1.5 py-0.5 rounded text-gray-300">
+                ENT
+              </span>
             </button>
             <button
-              className={`w-full text-left px-3 py-1.5 rounded flex items-center ${
+              className={`w-full text-left px-3 py-1.5 rounded flex justify-between items-center ${
                 menuSelectedIndex === 1 ? "bg-gray-700" : "hover:bg-gray-700"
               }`}
               onClick={() => {
@@ -392,26 +444,41 @@ export const ClipboardHistory: React.FC<ClipboardHistoryProps> = ({
                 setShowActionMenu(false);
               }}
             >
-              <span className="mr-2">🗑️</span>
-              <span>Delete</span>
+              <div className="flex items-center">
+                <span className="mr-2">🗑️</span>
+                <span>Delete</span>
+              </div>
+              <span className="text-xs bg-gray-900 px-1.5 py-0.5 rounded text-gray-300">
+                SHIFT+D
+              </span>
             </button>
-            {pinnedItems.length < 3 && (
-              <button
-                className={`w-full text-left px-3 py-1.5 rounded flex items-center mb-1 ${
-                  menuSelectedIndex === 2 ? "bg-gray-700" : "hover:bg-gray-700"
-                }`}
-                onClick={() => {
-                  pinItem(history[selectedIndex].id);
-                  setShowActionMenu(false);
-                }}
-              >
-                <span className="mr-2">📌</span>
-                <span>Pin</span>
-              </button>
-            )}
+            <button
+              className={`w-full text-left px-3 py-1.5 rounded flex justify-between items-center ${
+                menuSelectedIndex === 2 ? "bg-gray-700" : "hover:bg-gray-700"
+              }`}
+              onClick={() => {
+                const selectedItem = history[selectedIndex];
+                if (selectedItem.pinned) {
+                  pinItem(selectedItem.id);
+                } else if (pinnedItems.length < 3) {
+                  pinItem(selectedItem.id);
+                }
+                setShowActionMenu(false);
+              }}
+            >
+              <div className="flex items-center">
+                <span className="mr-2">
+                  {history[selectedIndex]?.pinned ? "📌" : "📌"}
+                </span>
+                <span>{history[selectedIndex]?.pinned ? "Unpin" : "Pin"}</span>
+              </div>
+              <span className="text-xs bg-gray-900 px-1.5 py-0.5 rounded text-gray-300">
+                SHIFT+P
+              </span>
+            </button>
             <div className="border-t border-gray-700">
               <button
-                className={`w-full text-left px-3 py-1.5 rounded flex items-center mt-1 ${
+                className={`w-full text-left px-3 py-1.5 rounded flex justify-between items-center mt-1 ${
                   menuSelectedIndex === 3 ? "bg-gray-700" : "hover:bg-gray-700"
                 }`}
                 onClick={() => {
@@ -419,8 +486,13 @@ export const ClipboardHistory: React.FC<ClipboardHistoryProps> = ({
                   setShowActionMenu(false);
                 }}
               >
-                <span className="mr-2">🧹</span>
-                <span>Clear All</span>
+                <div className="flex items-center">
+                  <span className="mr-2">🧹</span>
+                  <span>Clear All</span>
+                </div>
+                <span className="text-xs bg-gray-900 px-1.5 py-0.5 rounded text-gray-300">
+                  ALT+SHIFT+D
+                </span>
               </button>
             </div>
           </div>

@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Product Id="*" Name="blazecast" UpgradeCode="d5389850-b32e-451e-a55e-e0bea9eef4dc" Version="0.1.0" Language="en-US" Manufacturer="Blazecast" Codepage="1252">
+    <Package InstallerVersion="200" Compressed="yes" />
+    
+    <!-- Required directories -->
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="ProgramFilesFolder">
+        <Directory Id="INSTALLDIR" Name="blazecast" />
+      </Directory>
+    </Directory>
+
+    <!-- Your custom uninstall action -->
+    <CustomAction 
+      Id="CleanAutostart" 
+      FileKey="blazecast.exe" 
+      ExeCommand="--uninstall" 
+      Execute="deferred" 
+      Impersonate="no"/>
+      
+    <InstallExecuteSequence>
+      <Custom Action="CleanAutostart" Before="InstallFinalize">
+        (REMOVE="ALL")
+      </Custom>
+    </InstallExecuteSequence>
+
+    <!-- Tauri's default components -->
+    <Feature Id="MainFeature" Title="Main Feature" Level="1">
+      <ComponentGroupRef Id="main" />
+    </Feature>
+  </Product>
+</Wix>

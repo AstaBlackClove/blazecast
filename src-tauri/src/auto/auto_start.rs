@@ -20,3 +20,24 @@ pub fn enable_autostart() {
         }
     }
 }
+
+
+#[cfg(target_os = "windows")]
+pub fn disable_autostart() {
+    use winreg::enums::*;
+    use winreg::RegKey;
+
+    let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+    let path = "Software\\Microsoft\\Windows\\CurrentVersion\\Run";
+
+    match hkcu.open_subkey_with_flags(path, KEY_ALL_ACCESS) {
+        Ok(key) => {
+            if let Err(e) = key.delete_value("YourAppName") {
+                if e.kind() != std::io::ErrorKind::NotFound {
+                    eprintln!("Error removing registry: {}", e);
+                }
+            }
+        }
+        Err(e) => eprintln!("Error opening registry: {}", e),
+    }
+}

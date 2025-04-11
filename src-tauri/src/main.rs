@@ -4,7 +4,7 @@ use tauri::GlobalShortcutManager;
 use tauri::Manager;
 mod auto;
 mod commands;
-use auto::auto_start::enable_autostart;
+use auto::auto_start::{disable_autostart, enable_autostart};
 use commands::clip_board::{
     clear_system_clipboard, delete_from_clipboard, get_clipboard, load_clipboard_history,
     pin_clipboard_item, save_clipboard_history, set_clipboard,
@@ -12,11 +12,11 @@ use commands::clip_board::{
 use commands::fetch_app::{
     get_index_status, get_recent_apps, hide_window, init_app_index, open_app, search_apps,
 };
-use commands::window_resize::resize_window;
 use commands::quick_link::{
     delete_quick_link, execute_quick_link, execute_quick_link_with_command, get_quick_links,
     get_recent_quick_links, save_quick_link,
 };
+use commands::window_resize::resize_window;
 
 fn main() {
     let tray_menu = tauri::SystemTrayMenu::new()
@@ -24,6 +24,13 @@ fn main() {
         .add_native_item(tauri::SystemTrayMenuItem::Separator)
         .add_item(tauri::CustomMenuItem::new("quit", "Quit"));
     let system_tray = tauri::SystemTray::new().with_menu(tray_menu);
+
+    // Check for uninstall flag first
+    let args: Vec<String> = std::env::args().collect();
+    if args.iter().any(|arg| arg == "--uninstall") {
+        disable_autostart();
+        return;
+    }
 
     tauri::Builder::default()
         .system_tray(system_tray)

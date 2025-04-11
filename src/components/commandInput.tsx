@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 type Props = {
   query: string;
@@ -23,6 +23,8 @@ export function CommandInput({
   showBackButton = false,
   onBackClick,
 }: Props) {
+  const inputRef = useRef<HTMLInputElement>(null);
+
   // Reset input when resetTrigger changes
   useEffect(() => {
     if (resetTrigger > 0) {
@@ -46,12 +48,20 @@ export function CommandInput({
     }
   };
 
+  // Add this useEffect to handle focus
+  useEffect(() => {
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [resetTrigger]);
+
   // Clear the input when the window is hidden
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.hidden) {
         onQueryChange("");
-        onQueryChange("");
+      } else if (inputRef.current) {
+        inputRef.current.focus(); // Focus when app becomes visible
       }
     };
     document.addEventListener("visibilitychange", handleVisibilityChange);
@@ -84,6 +94,7 @@ export function CommandInput({
         </div>
       )}
       <input
+        ref={inputRef}
         id="command-input"
         autoFocus
         type="text"

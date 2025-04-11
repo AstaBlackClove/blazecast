@@ -153,7 +153,7 @@ pub fn pin_clipboard_item(item_id: u64, app_handle: tauri::AppHandle) -> Result<
 
     // Find the item and pin it
     if let Some(item) = history.items.iter_mut().find(|i| i.id == item_id) {
-        item.pinned = true;
+        item.pinned = !item.pinned;
     } else {
         return Err("Item not found".to_string());
     }

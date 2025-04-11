@@ -58,10 +58,6 @@ export function QuickLinkQueryExecutor({
           if (e.key === "Escape") {
             e.preventDefault();
             onClose();
-            const commandInput = document.getElementById("command-input");
-            if (commandInput) {
-              (commandInput as HTMLInputElement).focus();
-            }
           }
         }}
       >

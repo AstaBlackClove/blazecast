@@ -52,7 +52,6 @@ export function SuggestionList({
           if (selectedSuggestion) {
             invoke("delete_quick_link", { quickLinkId: selectedSuggestion.id })
               .then(() => {
-                console.log("Quick link deleted!");
                 if (onDeleteQuickLink) {
                   onDeleteQuickLink();
                 }
