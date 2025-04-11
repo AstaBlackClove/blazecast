@@ -337,9 +337,9 @@ function App() {
     });
 
     setQuickLinkQueryData(null);
-    await invoke("hide_window");
     setQuery("");
     setResetTrigger((prev) => prev + 1);
+    await invoke("hide_window");
   };
 
   useEffect(() => {

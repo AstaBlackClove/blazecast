@@ -65,15 +65,6 @@ export function QuickLinkQueryExecutor({
           }
         }}
       >
-        {/* <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-semibold text-white">
-            Execute {quickLinkName}
-          </h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-white">
-            ✕
-          </button>
-        </div> */}
-
         {error && (
           <div className="bg-red-500 bg-opacity-20 border border-red-500 text-red-300 px-4 py-2 rounded mb-4">
             {error}
@@ -106,22 +97,6 @@ export function QuickLinkQueryExecutor({
               {postQueryPart}
             </div>
           </div>
-
-          {/* <div className="flex justify-end space-x-3 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded"
-            >
-              Execute
-            </button>
-          </div> */}
         </form>
       </div>
     </div>
