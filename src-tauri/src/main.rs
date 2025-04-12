@@ -13,8 +13,9 @@ use commands::fetch_app::{
     get_index_status, get_recent_apps, hide_window, init_app_index, open_app, search_apps,
 };
 use commands::quick_link::{
-    delete_quick_link, execute_quick_link, execute_quick_link_with_command, get_quick_links,
-    get_recent_quick_links, save_quick_link,
+    check_vscode_path, delete_quick_link, execute_quick_link, execute_quick_link_with_command,
+    get_default_browser, get_open_with_suggestions, get_quick_links, get_recent_quick_links,
+    save_quick_link,
 };
 use commands::window_resize::resize_window;
 
@@ -67,7 +68,10 @@ fn main() {
             save_quick_link,
             execute_quick_link,
             execute_quick_link_with_command,
-            delete_quick_link
+            delete_quick_link,
+            get_open_with_suggestions,
+            check_vscode_path,
+            get_default_browser
         ])
         .setup(|app| {
             // Initialize quick links

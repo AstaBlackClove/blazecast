@@ -1,10 +1,15 @@
-use tauri::{command, AppHandle, State};
-use uuid::Uuid;
-
+use crate::commands::quick_link::executor::execute_command;
 use crate::commands::quick_link::models::{NewQuickLinkInput, QuickLink};
 use crate::commands::quick_link::state::QuickLinkState;
-use crate::commands::quick_link::storage::{delete_quick_link_from_disk, save_quick_link_to_disk, update_quick_link_usage};
-use crate::commands::quick_link::executor::execute_command;
+use crate::commands::quick_link::storage::{
+    delete_quick_link_from_disk, save_quick_link_to_disk, update_quick_link_usage,
+};
+use tauri::{command, AppHandle, State};
+use uuid::Uuid;
+use winreg::enums::HKEY_CURRENT_USER;
+use winreg::RegKey;
+
+use super::models::OpenWith;
 
 // Command to save a quick link
 #[command]
@@ -16,13 +21,22 @@ pub async fn save_quick_link(
     let quick_link_input: NewQuickLinkInput = serde_json::from_value(quick_link)
         .map_err(|e| format!("Invalid quick link input data: {}", e))?;
 
+    let open_with = match quick_link_input.open_with.as_str() {
+        "browser" => OpenWith::Browser,
+        "terminal" => OpenWith::Terminal,
+        "app" => OpenWith::App,
+        "explorer" => OpenWith::Explorer,
+        "vscode" => OpenWith::VSCode,
+        _ => OpenWith::Browser, // Default to browser
+    };
+    let open_with_string = open_with.as_str().to_string();
     // Now manually build a full QuickLink
     let new_quick_link = QuickLink {
         id: Uuid::new_v4().to_string(),
         name: quick_link_input.name,
         command: quick_link_input.command,
         icon: quick_link_input.icon,
-        open_with: quick_link_input.open_with,
+        open_with: open_with_string,
         description: quick_link_input.description,
         last_used: None,
         use_count: 0,
@@ -159,4 +173,84 @@ pub async fn execute_quick_link_with_command(
     update_quick_link_usage(&app_handle, &quick_link_state, &quick_link_id).await?;
 
     Ok(())
+}
+
+pub fn get_vscode_path() -> Option<String> {
+    println!("get vscode triggered");
+
+    use std::path::Path;
+    use winreg::enums::*;
+    use winreg::RegKey;
+
+    let check_key = |root: RegKey| -> Option<String> {
+        // Use KEY_WOW64_64KEY to access 64-bit registry explicitly
+        let vscode_key = root
+            .open_subkey_with_flags(
+                "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\App Paths\\Code.exe",
+                KEY_READ | KEY_WOW64_64KEY,
+            )
+            .ok()?;
+
+        let path_str: String = vscode_key.get_value("").ok()?;
+
+        println!("Launching app at path: {}", path_str);
+
+        // Split potential arguments and trim quotes
+        let trimmed_path = path_str
+            .split(' ') // Split on spaces (common for arguments)
+            .next()? // Take the first part (the actual path)
+            .trim_matches('"')
+            .to_string();
+
+        let path = Path::new(&trimmed_path);
+        if path.exists() {
+            println!("Found VS Code at: {}", trimmed_path);
+            Some(trimmed_path)
+        } else {
+            println!("Path does not exist: {}", trimmed_path);
+            None
+        }
+    };
+
+    // Check HKLM
+    if let Some(path) = check_key(RegKey::predef(HKEY_LOCAL_MACHINE)) {
+        return Some(path);
+    }
+
+    // Check HKCU
+    if let Some(path) = check_key(RegKey::predef(HKEY_CURRENT_USER)) {
+        return Some(path);
+    }
+
+    None
+}
+
+#[tauri::command]
+pub async fn check_vscode_path() -> Option<String> {
+    get_vscode_path()
+}
+
+// Get the default browser on Windows
+#[tauri::command]
+pub async fn get_default_browser() -> Option<String> {
+    #[cfg(target_os = "windows")]
+    {
+        // New Windows registry code
+        let reg_key = RegKey::predef(HKEY_CURRENT_USER)
+            .open_subkey(
+                r"Software\Microsoft\Windows\Shell\Associations\UrlAssociations\http\UserChoice",
+            )
+            .ok()?;
+
+        let prog_id: String = reg_key.get_value("ProgId").ok()?;
+
+        // Map ProgID to a browser name (e.g., "ChromeHTML" => "Google Chrome")
+        match prog_id.as_str() {
+            "ChromeHTML" => Some("Google Chrome".to_string()),
+            "FirefoxURL" => Some("Mozilla Firefox".to_string()),
+            "MSEdgeHTM" => Some("Microsoft Edge".to_string()),
+            "IE.HTTP" => Some("Internet Explorer".to_string()),
+            _ => Some(prog_id), // Fallback to raw ProgID if unknown
+        }
+    }
 }

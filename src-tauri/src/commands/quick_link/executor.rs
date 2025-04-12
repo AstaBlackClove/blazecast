@@ -1,16 +1,15 @@
+use crate::commands::quick_link::{commands::get_vscode_path, models::QuickLink};
+use std::path::Path;
 use tauri::{api::shell, AppHandle, Manager};
 
-use crate::commands::quick_link::models::{OpenWith, QuickLink};
-
-// Helper function to execute a command based on open_with setting
+// Enhanced executor that handles more open options
 pub async fn execute_command(app_handle: &AppHandle, quick_link: &QuickLink) -> Result<(), String> {
-    match quick_link.open_with {
-        OpenWith::Browser => {
+    match quick_link.open_with.as_str() {
+        "browser" => {
             shell::open(&app_handle.shell_scope(), &quick_link.command, None)
                 .map_err(|e| format!("Failed to open URL in browser: {}", e))?;
         }
-        OpenWith::Terminal => {
-            // Implementation depends on your OS and requirements
+        "terminal" => {
             #[cfg(target_os = "windows")]
             {
                 let home_dir =
@@ -26,8 +25,44 @@ pub async fn execute_command(app_handle: &AppHandle, quick_link: &QuickLink) -> 
                     .map_err(|e| format!("Failed to execute in terminal: {}", e))?;
             }
         }
-        OpenWith::App => {
-            // Open in default application
+        "explorer" => {
+            #[cfg(target_os = "windows")]
+            {
+                // Open folder in Windows Explorer
+                let path = Path::new(&quick_link.command);
+                if path.exists() && path.is_dir() {
+                    std::process::Command::new("explorer")
+                        .arg(&quick_link.command)
+                        .spawn()
+                        .map_err(|e| format!("Failed to open in Windows Explorer: {}", e))?;
+                } else {
+                    // Try to open it anyway
+                    std::process::Command::new("explorer")
+                        .arg(&quick_link.command)
+                        .spawn()
+                        .map_err(|e| format!("Failed to open in Windows Explorer: {}", e))?;
+                }
+            }
+        }
+        "vscode" => {
+            #[cfg(target_os = "windows")]
+            {
+                if let Some(vscode_path) = get_vscode_path() {
+                    std::process::Command::new(vscode_path)
+                        .arg(&quick_link.command)
+                        .spawn()
+                        .map_err(|e| format!("Failed to open in VS Code: {}", e))?;
+                } else {
+                    return Err("VS Code not found. Ensure it's installed and the path is correct.".to_string());
+                }
+            }
+            #[cfg(not(target_os = "windows"))]
+            {
+                return Err("Opening in VS Code is not supported on this OS.".to_string());
+            }
+        }
+        "app" | _ => {
+            // Open with default application or fallback
             shell::open(&app_handle.shell_scope(), &quick_link.command, None)
                 .map_err(|e| format!("Failed to open with default app: {}", e))?;
         }
