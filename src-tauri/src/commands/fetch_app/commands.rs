@@ -101,6 +101,15 @@ pub async fn get_recent_apps(
     Ok(recent_apps)
 }
 
+#[tauri::command]
+pub async fn refresh_app_index(
+    app_index_state: State<'_, AppIndexState>,
+) -> Result<(), String> {
+    // Start background refresh
+    crate::commands::fetch_app::app_index::refresh_app_index(&app_index_state);
+    Ok(())
+}
+
 // Open app and record access
 #[tauri::command]
 pub async fn open_app(

@@ -27,7 +27,13 @@ export function useSuggestions(query: string): Suggestion[] {
         "quicklink",
         "quick link",
       ];
+
+      const refreshKeyword = ["re", "refresh", "reload"];
       const shouldShowQuickLink = quickLinkKeywords.some((keyword) =>
+        trimmedQuery.toLowerCase().includes(keyword)
+      );
+
+      const shouldShowRefresh = refreshKeyword.some((keyword) =>
         trimmedQuery.toLowerCase().includes(keyword)
       );
 
@@ -38,6 +44,23 @@ export function useSuggestions(query: string): Suggestion[] {
           subtitle: "Create a new quick link to a website or application",
           category: "Actions",
           icon: "🔗",
+        });
+      }
+
+      if (shouldShowRefresh) {
+        results.push({
+          id: ActionType.REFRESH_APP_INDEX,
+          title: "Refresh App",
+          subtitle: "Refresh indexed applicaiton to detect new application",
+          category: "Actions",
+          icon: "🔄",
+          action: async () => {
+            try {
+              await invoke("refresh_app_index");
+            } catch (error) {
+              console.error("Failed to refresh app index:", error);
+            }
+          },
         });
       }
 

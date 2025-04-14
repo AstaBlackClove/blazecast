@@ -58,7 +58,7 @@ pub fn save_app_index(index: &AppIndex) -> Result<(), String> {
 }
 
 // Build app index from registry
-pub fn build_app_index() -> Result<AppIndex, String> {
+pub fn build_app_index(force: bool) -> Result<AppIndex, String> {
     let mut index = load_app_index();
     let now = SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)
@@ -66,18 +66,30 @@ pub fn build_app_index() -> Result<AppIndex, String> {
         .as_secs();
 
     // Only update if older than 1 hour
-    if now - index.last_update < 3600 && !index.apps.is_empty() {
+    if !force && now - index.last_update < 3600 && !index.apps.is_empty() {
         return Ok(index);
     }
 
     // Get installed apps from registry
     let new_apps = read_installed_apps()?;
-    
+
     index.apps = new_apps;
     index.last_update = now;
     save_app_index(&index)?;
 
     Ok(index)
+}
+
+pub fn refresh_app_index(app_index_state: &AppIndexState) {
+    let index_clone = app_index_state.index.clone();
+
+    // Launch background thread to rebuild index
+    thread::spawn(move || {
+        if let Ok(new_index) = build_app_index(true) {
+            let mut index = index_clone.lock().unwrap();
+            *index = new_index;
+        }
+    });
 }
 
 // Initialize app index state
@@ -87,7 +99,7 @@ pub fn init_app_index() -> AppIndexState {
 
     // Launch background thread to build index
     thread::spawn(move || {
-        if let Ok(new_index) = build_app_index() {
+        if let Ok(new_index) = build_app_index(false) {
             let mut index = index_clone.lock().unwrap();
             *index = new_index;
         }

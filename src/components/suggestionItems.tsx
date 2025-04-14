@@ -23,7 +23,7 @@ export function SuggestionItem({ suggestion, selected, onClick }: Props) {
   const getIconClasses = () => {
     // Quick link creator gets a special highlight
     if (isQuickLinkCreator) {
-      return "w-6 h-6 mr-3 flex items-center justify-center bg-blue-600 rounded-md text-white";
+      return "w-6 h-6 mr-3 flex items-center justify-center rounded-md text-white";
     }
     // Default icon container
     return "w-5 h-5 mr-3 flex items-center justify-center";

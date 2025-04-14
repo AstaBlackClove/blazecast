@@ -1,5 +1,3 @@
-// Modify your App.tsx to implement these changes
-
 import { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/tauri";
 import { CommandInput } from "./components/commandInput";

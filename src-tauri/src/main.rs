@@ -1,8 +1,11 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+use commands::fetch_app::models::AppIndex;
+use commands::fetch_app::models::AppIndexState;
 use tauri::GlobalShortcutManager;
 use tauri::Manager;
 mod auto;
+use std::sync::{Arc, Mutex};
 mod commands;
 use auto::auto_start::{disable_autostart, enable_autostart};
 use commands::clip_board::{
@@ -10,7 +13,8 @@ use commands::clip_board::{
     pin_clipboard_item, save_clipboard_history, set_clipboard,
 };
 use commands::fetch_app::{
-    get_index_status, get_recent_apps, hide_window, init_app_index, open_app, search_apps,
+    get_index_status, get_recent_apps, hide_window, init_app_index, open_app, refresh_app_index,
+    search_apps,
 };
 use commands::quick_link::{
     check_vscode_path, delete_quick_link, execute_quick_link, execute_quick_link_with_command,
@@ -18,6 +22,23 @@ use commands::quick_link::{
     save_quick_link,
 };
 use commands::window_resize::resize_window;
+
+fn schedule_index_updates(app_index_state: Arc<Mutex<AppIndex>>) {
+    std::thread::spawn(move || {
+        loop {
+            // Sleep for 6 hours before refreshing (adjust as needed)
+            std::thread::sleep(std::time::Duration::from_secs(6 * 60 * 60));
+
+            // Create temporary AppIndexState for refresh
+            let temp_state = AppIndexState {
+                index: app_index_state.clone(),
+            };
+            println!("App refresh called"); 
+            // Refresh the index
+            commands::fetch_app::app_index::refresh_app_index(&temp_state);
+        }
+    });
+}
 
 fn main() {
     let tray_menu = tauri::SystemTrayMenu::new()
@@ -71,7 +92,8 @@ fn main() {
             delete_quick_link,
             get_open_with_suggestions,
             check_vscode_path,
-            get_default_browser
+            get_default_browser,
+            refresh_app_index
         ])
         .setup(|app| {
             // Initialize quick links
@@ -83,8 +105,8 @@ fn main() {
             app.manage(app_index_state);
 
             // Schedule periodic index updates
-            // let app_index = app.state::<AppIndexState>().index.clone();
-            // schedule_index_updates(app_index);
+            let app_index = app.state::<AppIndexState>().index.clone();
+            schedule_index_updates(app_index);
 
             // Register global shortcut (Alt+Space by default)
             let app_handle = app.handle();
