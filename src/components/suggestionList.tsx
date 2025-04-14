@@ -8,6 +8,7 @@ type Props = {
   selectedIndex: number;
   onSuggestionClick: (suggestion: Suggestion) => void;
   onDeleteQuickLink?: () => void;
+  showFooter?: boolean;
 };
 
 type IndexStatus = {
@@ -19,6 +20,7 @@ export function SuggestionList({
   selectedIndex,
   onSuggestionClick,
   onDeleteQuickLink,
+  showFooter = true,
 }: Props) {
   const [isIndexBuilding, setIsIndexBuilding] = useState(false);
 
@@ -132,7 +134,7 @@ export function SuggestionList({
             {Object.entries(groupedSuggestions).map(
               ([category, items], categoryIndex) => (
                 <div key={categoryIndex}>
-                  <div className="text-xs text-gray-500 px-4 py-2 uppercase tracking-wide">
+                  <div className="text-xs text-gray-400 px-4 py-2 uppercase tracking-wide">
                     {category}
                   </div>
                   {items.map((suggestion, itemIndex) => {
@@ -155,7 +157,7 @@ export function SuggestionList({
           </div>
         )}
       </div>
-      {suggestions.length > 0 && (
+      {showFooter && suggestions.length > 0 && (
         <div className="flex-shrink-0 bg-gray-700 border-t border-gray-800 px-4 py-2 text-xs text-gray-400">
           <div className="flex justify-between items-center">
             <div>Actions</div>

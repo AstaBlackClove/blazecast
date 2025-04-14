@@ -8,6 +8,7 @@ import { useClipboardHistory } from "./hooks/useClipboard";
 import { ClipboardHistory } from "./components/clipBoard/clipBoardHistory";
 import { QuickLinkCreator } from "./components/quickLink/quickLinkCreator";
 import { QuickLinkQueryExecutor } from "./components/quickLink/quickLinkQueryExe";
+import { Calculator } from "./components/calculator/calculator";
 
 function App() {
   const [query, setQuery] = useState("");
@@ -17,6 +18,8 @@ function App() {
     "apps"
   );
   const [resetTrigger, setResetTrigger] = useState(0);
+  const [calculatorResult, setCalculatorResult] = useState<string | null>(null);
+  const [showCalculatorCopied, setShowCalculatorCopied] = useState(false);
 
   // Quick link states - keep popup version for backward compatibility
   const [isQuickLinkCreatorOpen, setIsQuickLinkCreatorOpen] = useState(false);
@@ -101,6 +104,32 @@ function App() {
     };
   }, []);
 
+  // Handle Enter key press for calculator copy
+  useEffect(() => {
+    const handleEnterKeyForCalculator = (event: KeyboardEvent) => {
+      if (
+        event.key === "Enter" &&
+        mode === "apps" &&
+        isMathCalculation(query) &&
+        calculatorResult
+      ) {
+        event.preventDefault();
+        copyToClipboard(calculatorResult);
+        setShowCalculatorCopied(true);
+
+        // Hide the copied message after 2 seconds
+        setTimeout(() => {
+          setShowCalculatorCopied(false);
+        }, 2000);
+      }
+    };
+
+    window.addEventListener("keydown", handleEnterKeyForCalculator);
+    return () => {
+      window.removeEventListener("keydown", handleEnterKeyForCalculator);
+    };
+  }, [calculatorResult, query, mode]);
+
   // Refresh recent apps when app becomes visible or after reset
   useEffect(() => {
     fetchRecentApps(true);
@@ -168,7 +197,21 @@ function App() {
     setQuery(newQuery);
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
+    // Check if calculator is showing and we have a result to copy
+    if (mode === "apps" && isMathCalculation(query) && calculatorResult) {
+      await copyToClipboard(calculatorResult);
+      setShowCalculatorCopied(true);
+
+      // Hide the copied message after 2 seconds
+      setTimeout(() => {
+        setShowCalculatorCopied(false);
+      }, 2000);
+
+      return;
+    }
+
+    // Handle normal behavior
     if (mode === "apps" && displayedSuggestions.length > 0) {
       openSelectedApp();
     } else if (mode === "clipboard" && filteredClipboardHistory.length > 0) {
@@ -358,6 +401,30 @@ function App() {
     }
   };
 
+  const isMathCalculation = (query: string): boolean => {
+    // Check if the query contains numeric values and mathematical operators
+    const mathPattern = /[\d+\-*/.()\s]+/;
+
+    // Check if query has at least one digit and one operator
+    const hasDigit = /\d/.test(query);
+    const hasOperator = /[+\-*/]/.test(query);
+
+    // Make sure the query doesn't have other characters
+    const hasOnlyMathChars = /^[\d+\-*/.()\s]+$/.test(query);
+
+    return (
+      mathPattern.test(query) && hasDigit && hasOperator && hasOnlyMathChars
+    );
+  };
+
+  const handleCalculatorResult = (result: string | null) => {
+    setCalculatorResult(result);
+  };
+
+  // Determine if we should show calculator footer
+  const showCalculatorFooter =
+    mode === "apps" && isMathCalculation(query) && calculatorResult;
+
   return (
     <div className="flex flex-col w-full h-full rounded-xl overflow-hidden border border-gray-700">
       {mode !== "create_quick_link" && (
@@ -375,12 +442,21 @@ function App() {
       )}
       <div className="flex-grow overflow-hidden">
         {mode === "apps" ? (
-          <SuggestionList
-            suggestions={displayedSuggestions}
-            selectedIndex={selectedIndex}
-            onSuggestionClick={handleSuggestionClick}
-            onDeleteQuickLink={refreshSuggestions}
-          />
+          <>
+            {isMathCalculation(query) && (
+              <Calculator
+                query={query}
+                onResultAvailable={handleCalculatorResult}
+              />
+            )}
+            <SuggestionList
+              suggestions={displayedSuggestions}
+              selectedIndex={selectedIndex}
+              onSuggestionClick={handleSuggestionClick}
+              onDeleteQuickLink={refreshSuggestions}
+              showFooter={!showCalculatorFooter}
+            />
+          </>
         ) : mode === "clipboard" ? (
           <ClipboardHistory
             history={filteredClipboardHistory}
@@ -408,6 +484,25 @@ function App() {
           onClose={() => setQuickLinkQueryData(null)}
           onExecute={executeQuickLinkWithQuery}
         />
+      )}
+
+      {/* Calculator Footer */}
+      {showCalculatorFooter && (
+        <div className="flex-shrink-0 bg-gray-700 border-t border-gray-800 px-4 py-2 text-xs text-gray-400">
+          <div className="flex justify-between items-center">
+            <div>Calculator</div>
+            <div className="flex space-x-3">
+              <div className="flex items-center space-x-2">
+                <span className="bg-gray-800 px-2 py-1 rounded">↵</span>
+                <span>{showCalculatorCopied ? "Copied!" : "Copy Result"}</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <span className="bg-gray-800 px-2 py-1 rounded">ESC</span>
+                <span>Close</span>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
