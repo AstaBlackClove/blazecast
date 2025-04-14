@@ -53,12 +53,11 @@ pub async fn execute_command(app_handle: &AppHandle, quick_link: &QuickLink) -> 
                         .spawn()
                         .map_err(|e| format!("Failed to open in VS Code: {}", e))?;
                 } else {
-                    return Err("VS Code not found. Ensure it's installed and the path is correct.".to_string());
+                    return Err(
+                        "VS Code not found. Ensure it's installed and the path is correct."
+                            .to_string(),
+                    );
                 }
-            }
-            #[cfg(not(target_os = "windows"))]
-            {
-                return Err("Opening in VS Code is not supported on this OS.".to_string());
             }
         }
         "app" | _ => {

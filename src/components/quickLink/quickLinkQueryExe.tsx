@@ -42,6 +42,17 @@ export function QuickLinkQueryExecutor({
     }
   };
 
+  const handleClose = () => {
+    onClose();
+    // Focus the command input after closing
+    setTimeout(() => {
+      const commandInput = document.getElementById("command-input");
+      if (commandInput) {
+        (commandInput as HTMLInputElement).focus();
+      }
+    }, 0);
+  };
+
   useEffect(() => {
     // Focus on the query input when component mounts
     const queryInput = document.getElementById("quick-link-query-input");
@@ -57,7 +68,7 @@ export function QuickLinkQueryExecutor({
         onKeyDown={(e) => {
           if (e.key === "Escape") {
             e.preventDefault();
-            onClose();
+            handleClose();
           }
         }}
       >

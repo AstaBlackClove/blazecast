@@ -21,40 +21,65 @@ export function QuickLinkCreator({
     name: "",
     command: "",
     icon: "🔗",
-    open_with: "browser", // This is already a string, which is correct
+    open_with: "browser",
     description: "",
   });
 
   const [error, setError] = useState<string | null>(null);
-  // const [openWithSuggestions, setOpenWithSuggestions] = useState<
-  //   OpenWithSuggestion[]
-  // >([
-  //   { id: "browser", name: "Browser (Default)", icon: "🌐", is_default: true },
-  //   { id: "terminal", name: "Terminal", icon: "⚡", is_default: false },
-  //   { id: "app", name: "Application", icon: "📄", is_default: false },
-  // ]);
+  const [isFormValid, setIsFormValid] = useState(false);
 
   const [openWithSuggestions, setOpenWithSuggestions] = useState<
     OpenWithSuggestion[]
   >([]);
+
+  // Check form validity whenever name or command changes
+  useEffect(() => {
+    setIsFormValid(
+      formData.name.trim() !== "" && formData.command.trim() !== ""
+    );
+  }, [formData.name, formData.command]);
 
   useEffect(() => {
     const fetchOpenWithSuggestions = async () => {
       let suggestions: OpenWithSuggestion[] = [
         {
           id: "browser",
-          name: "Browser (Default)",
+          name: "Browser (Loading...)",
           icon: "🌐",
           is_default: true,
         },
         { id: "terminal", name: "Terminal", icon: "⚡", is_default: false },
-        { id: "app", name: "Application", icon: "📄", is_default: false },
       ];
+
+      // Set these initial suggestions right away
+      setOpenWithSuggestions(suggestions);
+
+      // Try to get the default browser first
+      try {
+        const defaultBrowser = await invoke<string>("get_default_browser");
+        if (defaultBrowser) {
+          // Update the browser entry with the actual browser name
+          suggestions = suggestions.map((sugg) =>
+            sugg.id === "browser"
+              ? { ...sugg, name: `${defaultBrowser} (Default)` }
+              : sugg
+          );
+
+          // Update the state with the browser info
+          setOpenWithSuggestions([...suggestions]);
+        }
+      } catch (error) {
+        console.error("Failed to get default browser:", error);
+        // If failed, at least update to show it's not loading anymore
+        suggestions = suggestions.map((sugg) =>
+          sugg.id === "browser" ? { ...sugg, name: "Browser (Default)" } : sugg
+        );
+        setOpenWithSuggestions([...suggestions]);
+      }
 
       try {
         // Check if VS Code is available
         const vscodePath = await invoke("check_vscode_path");
-        console.log(vscodePath);
         if (vscodePath) {
           suggestions.push({
             id: "vscode",
@@ -62,26 +87,12 @@ export function QuickLinkCreator({
             icon: "📝",
             is_default: false,
           });
+        } else {
+          console.log("VS Code path returned null");
         }
       } catch (error) {
         console.error("VS Code not found:", error);
       }
-
-      try {
-        // Get the default browser
-        const defaultBrowser = await invoke<string>("get_default_browser");
-        console.log(defaultBrowser);
-        if (defaultBrowser) {
-          // Update the existing "Browser" entry
-          suggestions = suggestions.map((sugg) =>
-            sugg.id === "browser" ? { ...sugg, name: defaultBrowser } : sugg
-          );
-        }
-      } catch (error) {
-        console.error("Failed to get default browser:", error);
-      }
-
-      setOpenWithSuggestions(suggestions);
     };
 
     fetchOpenWithSuggestions();
@@ -232,7 +243,7 @@ export function QuickLinkCreator({
           />
         </div>
 
-        <div className="flex flex-col mb-4">
+        <div className="flex flex-col mb-2">
           <label htmlFor="quick-link-command" className="text-gray-400 mb-2">
             Link or Path
           </label>
@@ -246,40 +257,19 @@ export function QuickLinkCreator({
               className="flex-1 bg-gray-700 text-white px-4 py-3 rounded-l-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="https://www.twitter.com/search?q={query} or C:\path\to\folder"
             />
-            <button
-              onClick={() => {}}
-              className="bg-gray-700 hover:bg-gray-600 text-white px-3 py-2 rounded-r-md border-l border-gray-600"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-              </svg>
-            </button>
           </div>
 
-          {formData.command.includes("http") && (
-            <div className="mt-2 text-sm text-gray-400">
-              Include an argument by inserting {"{query}"} in the URL. The word
-              "query" can be changed to anything and will be used as the
-              placeholder text.
-              <button
-                onClick={insertQueryPlaceholder}
-                className="ml-2 text-blue-400 hover:text-blue-300"
-              >
-                Insert {"{query}"}
-              </button>
-            </div>
-          )}
+          <div className="mt-2 text-sm text-gray-400">
+            Include an argument by inserting {"{query}"} in the URL. The word
+            "query" can be changed to anything and will be used as the
+            placeholder text.
+            <button
+              onClick={insertQueryPlaceholder}
+              className="ml-2 text-blue-400 hover:text-blue-300"
+            >
+              Insert {"{query}"}
+            </button>
+          </div>
         </div>
 
         <div className="flex flex-col mb-4">
@@ -328,7 +318,12 @@ export function QuickLinkCreator({
         </button>
         <button
           onClick={saveQuickLink}
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-md flex items-center"
+          disabled={!isFormValid}
+          className={`px-4 py-2 ${
+            isFormValid
+              ? "bg-blue-600 hover:bg-blue-500"
+              : "bg-blue-600/50 cursor-not-allowed"
+          } text-white rounded-md flex items-center`}
         >
           Create Quicklink
         </button>

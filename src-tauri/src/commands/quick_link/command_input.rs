@@ -2,6 +2,8 @@ use std::path::Path;
 use tauri;
 use url::Url;
 
+use super::get_default_browser;
+
 #[derive(Debug, Clone, serde::Serialize)]
 pub enum CommandType {
     Url(String),          // For web links
@@ -40,8 +42,8 @@ pub fn detect_command_type(command: &str) -> CommandType {
     // Windows-specific path detection (even if it doesn't exist yet)
     if cfg!(target_os = "windows") {
         // Check for Windows paths (C:\, etc.)
-        if command.len() >= 3 
-            && command.chars().nth(1) == Some(':') 
+        if command.len() >= 3
+            && command.chars().nth(1) == Some(':')
             && (command.chars().nth(2) == Some('\\') || command.chars().nth(2) == Some('/'))
         {
             // This looks like a Windows path
@@ -69,13 +71,19 @@ pub async fn get_open_with_suggestions(command: String) -> Vec<OpenWithSuggestio
     match command_type {
         CommandType::Url(_) => {
             // Add browser suggestions
+            // Try to get the default browser name
+            let browser_name = match get_default_browser().await {
+                Ok(name) => format!("{} (Default)", name),
+                Err(_) => "Default Browser".to_string(),
+            };
+
             suggestions.push(OpenWithSuggestion {
                 id: "browser".to_string(),
-                name: "Default Browser".to_string(),
+                name: browser_name,
                 icon: "🌐".to_string(),
                 is_default: true,
             });
-        },
+        }
         CommandType::FolderPath(_) => {
             // Add folder-related suggestions
             suggestions.push(OpenWithSuggestion {
@@ -84,14 +92,17 @@ pub async fn get_open_with_suggestions(command: String) -> Vec<OpenWithSuggestio
                 icon: "📁".to_string(),
                 is_default: true,
             });
-            
-            suggestions.push(OpenWithSuggestion {
-                id: "vscode".to_string(),
-                name: "Visual Studio Code".to_string(),
-                icon: "💻".to_string(),
-                is_default: false,
-            });
-        },
+
+            // Only add VS Code if it's available
+            if let Some(_) = crate::commands::quick_link::commands::get_vscode_path() {
+                suggestions.push(OpenWithSuggestion {
+                    id: "vscode".to_string(),
+                    name: "Visual Studio Code".to_string(),
+                    icon: "💻".to_string(),
+                    is_default: false,
+                });
+            }
+        }
         CommandType::FilePath(_) => {
             // Add file-related suggestions
             suggestions.push(OpenWithSuggestion {
@@ -100,14 +111,17 @@ pub async fn get_open_with_suggestions(command: String) -> Vec<OpenWithSuggestio
                 icon: "📄".to_string(),
                 is_default: true,
             });
-            
-            suggestions.push(OpenWithSuggestion {
-                id: "vscode".to_string(),
-                name: "Visual Studio Code".to_string(),
-                icon: "💻".to_string(),
-                is_default: false,
-            });
-        },
+
+            // Only add VS Code if it's available
+            if let Some(_) = crate::commands::quick_link::commands::get_vscode_path() {
+                suggestions.push(OpenWithSuggestion {
+                    id: "vscode".to_string(),
+                    name: "Visual Studio Code".to_string(),
+                    icon: "💻".to_string(),
+                    is_default: false,
+                });
+            }
+        }
         CommandType::ShellCommand(_) => {
             // For shell commands
             suggestions.push(OpenWithSuggestion {
@@ -119,7 +133,7 @@ pub async fn get_open_with_suggestions(command: String) -> Vec<OpenWithSuggestio
         }
     }
 
-    // Always add terminal as an option
+    // Always add terminal as an option for non-terminal commands
     if !matches!(command_type, CommandType::ShellCommand(_)) {
         suggestions.push(OpenWithSuggestion {
             id: "terminal".to_string(),

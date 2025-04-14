@@ -19,6 +19,7 @@ export function useSuggestions(query: string): Suggestion[] {
 
       // Check for quick link creation keywords
       const quickLinkKeywords = [
+        "cre",
         "create",
         "add",
         "new",
@@ -36,7 +37,7 @@ export function useSuggestions(query: string): Suggestion[] {
           title: "Create Quick Link",
           subtitle: "Create a new quick link to a website or application",
           category: "Actions",
-          icon: "🔗", // You can use a custom icon here
+          icon: "🔗",
         });
       }
 

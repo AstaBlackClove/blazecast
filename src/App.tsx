@@ -1,3 +1,5 @@
+// Modify your App.tsx to implement these changes
+
 import { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/tauri";
 import { CommandInput } from "./components/commandInput";
@@ -27,6 +29,7 @@ function App() {
   } | null>(null);
 
   const isClearing = useRef(false);
+  const lastFetchTime = useRef(0);
 
   const {
     clipboardHistory,
@@ -43,60 +46,40 @@ function App() {
         )
       : clipboardHistory;
 
-  const fetchRecentApps = async () => {
+  const fetchRecentApps = async (force = false) => {
     try {
+      // Throttle fetches to avoid hammering backend
+      const now = Date.now();
+      if (!force && now - lastFetchTime.current < 500) {
+        return; // Skip if fetched too recently
+      }
+
+      lastFetchTime.current = now;
+
+      // Always fetch fresh data from backend
       const apps: AppInfo[] = await invoke("get_recent_apps");
+
+      // Generate suggestions with updated action handlers
       const recentSuggestions = apps.map((app) => ({
         ...appToSuggestion(app),
         action: async () => {
+          // Ensure we're opening the correct app by ID
           await invoke("open_app", { appId: app.id });
           return false; // No modal opened
         },
       }));
+
+      // Update state with fresh data
       setRecentApps(recentSuggestions);
     } catch (error) {
       console.error("Failed to fetch recent apps:", error);
     }
   };
 
-  // Fetch quick links for recents
-  // const fetchRecentQuickLinks = async () => {
-  //   try {
-  //     const quickLinks: QuickLink[] = await invoke("get_recent_quick_links");
-  //     const quickLinkSuggestions = quickLinks.map((quickLink) => ({
-  //       id: `${quickLink.id}`,
-  //       title: quickLink.name,
-  //       subtitle: quickLink.description || quickLink.command,
-  //       icon: quickLink.icon,
-  //       category: "Quick Links",
-  //       hasQueryParam: quickLink.command.includes("{query}"), // Add this flag to track query params
-  //       action: async () => {
-  //         // If command contains {query}, we need to ask for the query value
-  //         if (quickLink.command.includes("{query}")) {
-  //           setQuickLinkQueryData({
-  //             id: quickLink.id,
-  //             name: quickLink.name,
-  //             command: quickLink.command,
-  //           });
-  //           return true; // Return true to indicate we're showing a modal
-  //         } else {
-  //           // Execute command directly
-  //           await invoke("execute_quick_link", { quickLinkId: quickLink.id });
-  //           return false; // Return false to indicate no modal is shown
-  //         }
-  //       },
-  //     }));
-
-  //     // Combine quick links with app suggestions in recent items
-  //     setRecentApps((prevApps: any) => [...quickLinkSuggestions, ...prevApps]);
-  //   } catch (error) {
-  //     console.error("Failed to fetch recent quick links:", error);
-  //   }
-  // };
-
+  // Initial setup
   useEffect(() => {
-    fetchRecentApps();
-    // fetchRecentQuickLinks();
+    // Force a fresh load of recent apps
+    fetchRecentApps(true);
 
     const handleShortcut = (event: KeyboardEvent) => {
       if (event.altKey && event.shiftKey && event.code === "KeyC") {
@@ -109,10 +92,21 @@ function App() {
     };
 
     window.addEventListener("keydown", handleShortcut);
+
+    // Add focus event listener to refresh recent apps when window gains focus
+    const handleFocus = () => fetchRecentApps(true);
+    window.addEventListener("focus", handleFocus);
+
     return () => {
       window.removeEventListener("keydown", handleShortcut);
+      window.removeEventListener("focus", handleFocus);
     };
   }, []);
+
+  // Refresh recent apps when app becomes visible or after reset
+  useEffect(() => {
+    fetchRecentApps(true);
+  }, [resetTrigger]);
 
   // Intercept search suggestions and enhance their action handlers
   const rawSuggestions: Suggestion[] = useSuggestions(query);
@@ -158,7 +152,7 @@ function App() {
         if (e.key === "Enter") {
           // Use integrated quick link creator instead of popup
           setMode("create_quick_link");
-          invoke("resize_window", { width: 750, height: 650 });
+          invoke("resize_window", { width: 750, height: 630 });
         }
       };
 
@@ -229,6 +223,13 @@ function App() {
 
     if (quickLinkQueryData) {
       setQuickLinkQueryData(null);
+      // Focus the command input when closing the query modal
+      setTimeout(() => {
+        const commandInput = document.getElementById("command-input");
+        if (commandInput) {
+          (commandInput as HTMLInputElement).focus();
+        }
+      }, 0);
       return;
     }
 
@@ -272,8 +273,8 @@ function App() {
           await invoke("hide_window");
           setQuery("");
           setResetTrigger((prev) => prev + 1);
-          await fetchRecentApps();
-          // await fetchRecentQuickLinks();
+          // Force refresh recent apps for next time
+          await fetchRecentApps(true);
         }
       } catch (error) {
         console.error(error);
@@ -292,8 +293,8 @@ function App() {
           await invoke("hide_window");
           setQuery("");
           setResetTrigger((prev) => prev + 1);
-          await fetchRecentApps();
-          // await fetchRecentQuickLinks();
+          // Force refresh recent apps for next time
+          await fetchRecentApps(true);
         }
       } catch (error) {
         console.error(error);
@@ -324,7 +325,6 @@ function App() {
     setMode("apps");
     setQuery("");
     setResetTrigger((prev) => prev + 1);
-    // await fetchRecentQuickLinks();
     invoke("resize_window", { width: 750, height: 500 });
   };
 
@@ -351,18 +351,11 @@ function App() {
   const refreshSuggestions = async () => {
     setSelectedIndex(0);
 
-    if (query.trim() === "") {
-      // If user is browsing recents → clear and fetch again
-      setRecentApps([]);
-      await fetchRecentApps();
-      // await fetchRecentQuickLinks();
-    } else {
-      // Always refresh recents after delete too
-      setRecentApps([]);
-      await fetchRecentApps();
-      // await fetchRecentQuickLinks();
+    // Always force refresh recent apps for any refresh operation
+    await fetchRecentApps(true);
 
-      // Then refresh search view
+    if (query.trim() !== "") {
+      // Then refresh search view if needed
       setQuery((prev) => prev + " ");
     }
   };

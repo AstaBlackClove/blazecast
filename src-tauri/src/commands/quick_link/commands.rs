@@ -176,53 +176,101 @@ pub async fn execute_quick_link_with_command(
 }
 
 pub fn get_vscode_path() -> Option<String> {
-    println!("get vscode triggered");
+    #[cfg(target_os = "windows")]
+    {
+        use std::path::Path;
+        use winreg::enums::*;
+        use winreg::RegKey;
 
-    use std::path::Path;
-    use winreg::enums::*;
-    use winreg::RegKey;
+        // Common VS Code installation paths to check as fallbacks
+        let common_paths = [
+            r"C:\Program Files\Microsoft VS Code\Code.exe",
+            r"C:\Program Files (x86)\Microsoft VS Code\Code.exe",
+            r"%LOCALAPPDATA%\Programs\Microsoft VS Code\Code.exe",
+        ];
 
-    let check_key = |root: RegKey| -> Option<String> {
-        // Use KEY_WOW64_64KEY to access 64-bit registry explicitly
-        let vscode_key = root
-            .open_subkey_with_flags(
-                "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\App Paths\\Code.exe",
-                KEY_READ | KEY_WOW64_64KEY,
-            )
-            .ok()?;
+        // Check registry first (App Paths) - silently handle registry errors
+        let check_reg_key = |root: RegKey, subkey: &str| -> Option<String> {
+            // Try to open the registry key - silently return None if fails
+            let vscode_key = match root.open_subkey_with_flags(subkey, KEY_READ | KEY_WOW64_64KEY) {
+                Ok(key) => key,
+                Err(_) => return None, // Silently fail without logging
+            };
 
-        let path_str: String = vscode_key.get_value("").ok()?;
+            // Try to get the value - silently return None if fails
+            let path_str: String = match vscode_key.get_value("") {
+                Ok(path) => path,
+                Err(_) => return None, // Silently fail without logging
+            };
 
-        println!("Launching app at path: {}", path_str);
+            // Split potential arguments and trim quotes
+            let trimmed_path = path_str
+                .split(' ') // Split on spaces (common for arguments)
+                .next()? // Take the first part (the actual path)
+                .trim_matches('"')
+                .to_string();
 
-        // Split potential arguments and trim quotes
-        let trimmed_path = path_str
-            .split(' ') // Split on spaces (common for arguments)
-            .next()? // Take the first part (the actual path)
-            .trim_matches('"')
-            .to_string();
+            let path = Path::new(&trimmed_path);
+            if path.exists() {
+                Some(trimmed_path)
+            } else {
+                None
+            }
+        };
 
-        let path = Path::new(&trimmed_path);
-        if path.exists() {
-            println!("Found VS Code at: {}", trimmed_path);
-            Some(trimmed_path)
-        } else {
-            println!("Path does not exist: {}", trimmed_path);
-            None
+        // Registry keys to check
+        let registry_checks = [
+            (
+                HKEY_LOCAL_MACHINE,
+                r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\Code.exe",
+            ),
+            (
+                HKEY_CURRENT_USER,
+                r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\Code.exe",
+            ),
+            (
+                HKEY_LOCAL_MACHINE,
+                r"SOFTWARE\Classes\Applications\Code.exe\shell\open\command",
+            ),
+            (HKEY_CLASSES_ROOT, r"vscode\shell\open\command"),
+        ];
+
+        // Check all registry locations
+        for (hkey, subkey) in registry_checks.iter() {
+            if let Some(path) = check_reg_key(RegKey::predef(*hkey), subkey) {
+                return Some(path);
+            }
         }
-    };
 
-    // Check HKLM
-    if let Some(path) = check_key(RegKey::predef(HKEY_LOCAL_MACHINE)) {
-        return Some(path);
+        // Try common installation paths as fallback
+        for path in common_paths.iter() {
+            let expanded_path = if path.contains("%LOCALAPPDATA%") {
+                if let Some(local_app_data) = std::env::var_os("LOCALAPPDATA") {
+                    path.replace("%LOCALAPPDATA%", local_app_data.to_string_lossy().as_ref())
+                } else {
+                    continue;
+                }
+            } else {
+                path.to_string()
+            };
+            let p = Path::new(&expanded_path);
+            if p.exists() {
+                return Some(expanded_path);
+            }
+        }
+
+        // Additionally check if VS Code is in PATH
+        if let Ok(output) = std::process::Command::new("where").arg("code").output() {
+            if output.status.success() {
+                let path = String::from_utf8_lossy(&output.stdout);
+                let path = path.lines().next().unwrap_or("").trim();
+                if !path.is_empty() {
+                    return Some(path.to_string());
+                }
+            }
+        }
+        None
     }
-
-    // Check HKCU
-    if let Some(path) = check_key(RegKey::predef(HKEY_CURRENT_USER)) {
-        return Some(path);
-    }
-
-    None
 }
 
 #[tauri::command]
@@ -232,25 +280,81 @@ pub async fn check_vscode_path() -> Option<String> {
 
 // Get the default browser on Windows
 #[tauri::command]
-pub async fn get_default_browser() -> Option<String> {
+pub async fn get_default_browser() -> Result<String, String> {
     #[cfg(target_os = "windows")]
     {
-        // New Windows registry code
-        let reg_key = RegKey::predef(HKEY_CURRENT_USER)
-            .open_subkey(
-                r"Software\Microsoft\Windows\Shell\Associations\UrlAssociations\http\UserChoice",
-            )
-            .ok()?;
+        // Try multiple registry paths for better detection
+        let registry_checks = [
+            r"Software\Microsoft\Windows\Shell\Associations\UrlAssociations\http\UserChoice",
+            r"Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.html\UserChoice",
+        ];
 
-        let prog_id: String = reg_key.get_value("ProgId").ok()?;
-
-        // Map ProgID to a browser name (e.g., "ChromeHTML" => "Google Chrome")
-        match prog_id.as_str() {
-            "ChromeHTML" => Some("Google Chrome".to_string()),
-            "FirefoxURL" => Some("Mozilla Firefox".to_string()),
-            "MSEdgeHTM" => Some("Microsoft Edge".to_string()),
-            "IE.HTTP" => Some("Internet Explorer".to_string()),
-            _ => Some(prog_id), // Fallback to raw ProgID if unknown
+        for reg_path in registry_checks {
+            if let Ok(reg_key) = RegKey::predef(HKEY_CURRENT_USER).open_subkey(reg_path) {
+                if let Ok(prog_id) = reg_key.get_value::<String, _>("ProgId") {
+                    // Map ProgID to a browser name
+                    let browser_name = match prog_id.as_str() {
+                        "ChromeHTML" => "Google Chrome",
+                        "FirefoxURL" | "Firefox-308046B0AF4A39CB" => "Mozilla Firefox",
+                        "MSEdgeHTM" | "AppXq0fevzme2pys62n3e0fbqa7peapykr8v" => "Microsoft Edge",
+                        "IE.HTTP" => "Internet Explorer",
+                        "OperaStable" => "Opera",
+                        "BraveHTML" => "Brave",
+                        "SafariHTML" => "Safari",
+                        "ChromiumHTM" => "Chromium",
+                        "VivaldiHTM" => "Vivaldi",
+                        _ => {
+                            // Try to extract name from ProgID if it's not in our map
+                            if prog_id.contains("Chrome") {
+                                "Google Chrome"
+                            } else if prog_id.contains("Firefox") {
+                                "Mozilla Firefox"
+                            } else if prog_id.contains("Edge") {
+                                "Microsoft Edge"
+                            } else if prog_id.contains("Opera") {
+                                "Opera"
+                            } else if prog_id.contains("Brave") {
+                                "Brave"
+                            } else {
+                                &prog_id // Fallback to raw ProgID if unknown
+                            }
+                        }
+                    };
+                    return Ok(browser_name.to_string());
+                }
+            }
         }
+
+        // Alternative method using default apps settings
+        if let Ok(root) = RegKey::predef(HKEY_CURRENT_USER)
+            .open_subkey(r"Software\Microsoft\Windows\CurrentVersion\ApplicationAssociationToasts")
+        {
+            for (name, _) in root.enum_values().filter_map(Result::ok) {
+                if name.contains("_http") {
+                    let parts: Vec<&str> = name.split('_').collect();
+                    if parts.len() > 1 {
+                        let app_name = parts[0];
+
+                        // Clean up and format the browser name
+                        let browser_name = if app_name.contains("Chrome") {
+                            "Google Chrome"
+                        } else if app_name.contains("Firefox") {
+                            "Mozilla Firefox"
+                        } else if app_name.contains("Edge") {
+                            "Microsoft Edge"
+                        } else if app_name.contains("Opera") {
+                            "Opera"
+                        } else if app_name.contains("Brave") {
+                            "Brave"
+                        } else {
+                            app_name
+                        };
+
+                        return Ok(browser_name.to_string());
+                    }
+                }
+            }
+        }
+        Ok("Web Browser".to_string())
     }
 }

@@ -41,8 +41,8 @@
       {
         "label": "main",
         "title": "blazecast",
-        "width": 600,
-        "height": 400,
+        "width": 750,
+        "height": 500,
         "resizable": true,
         "fullscreen": false,
         "decorations": false,
