@@ -1,11 +1,13 @@
-// storage.rs - Updated version
 use aes_gcm::aead::Aead;
-use aes_gcm::{Aes256Gcm, Key, KeyInit, Nonce}; // Note: KeyInit instead of NewAead
+use aes_gcm::{Aes256Gcm, Key, KeyInit, Nonce};
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use rand::{rngs::OsRng, RngCore};
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::path::PathBuf; // Updated base64 usage
+use std::path::PathBuf;
+use std::ptr;
+use winapi::um::dpapi::{CryptProtectData, CryptUnprotectData};
+use winapi::um::wincrypt::DATA_BLOB;
 
 #[derive(Serialize, Deserialize)]
 pub struct ClipboardHistoryFile {
@@ -36,21 +38,104 @@ fn get_history_file_path(app_handle: &tauri::AppHandle) -> Result<PathBuf, Strin
     Ok(app_data_dir.join("clipboard_history.encrypted"))
 }
 
-// Generate or retrieve encryption key
-fn get_encryption_key(app_handle: &tauri::AppHandle) -> Result<[u8; 32], String> {
-    let key_file_path = app_handle
+// Get the path to the protected encryption key file
+fn get_protected_key_path(app_handle: &tauri::AppHandle) -> Result<PathBuf, String> {
+    let app_data_dir = app_handle
         .path_resolver()
         .app_data_dir()
-        .ok_or_else(|| "Failed to get app data directory".to_string())?
-        .join("encryption_key.bin");
+        .ok_or_else(|| "Failed to get app data directory".to_string())?;
 
-    if key_file_path.exists() {
-        // Read existing key
-        let key_data = fs::read(&key_file_path)
-            .map_err(|e| format!("Failed to read encryption key: {}", e))?;
+    Ok(app_data_dir.join("protected_key.bin"))
+}
+
+// Windows DPAPI encrypt function
+fn dpapi_encrypt(data: &[u8]) -> Result<Vec<u8>, String> {
+    unsafe {
+        let mut in_blob = DATA_BLOB {
+            cbData: data.len() as u32,
+            pbData: data.as_ptr() as *mut _,
+        };
+
+        let mut out_blob = DATA_BLOB {
+            cbData: 0,
+            pbData: ptr::null_mut(),
+        };
+
+        let result = CryptProtectData(
+            &mut in_blob,
+            ptr::null(),     // description
+            ptr::null_mut(), // entropy
+            ptr::null_mut(), // reserved
+            ptr::null_mut(), // prompt struct
+            0,               // flags
+            &mut out_blob,
+        );
+
+        if result == 0 {
+            return Err("DPAPI encryption failed".to_string());
+        }
+
+        let encrypted_data =
+            std::slice::from_raw_parts(out_blob.pbData, out_blob.cbData as usize).to_vec();
+
+        // Free the memory allocated by CryptProtectData
+        winapi::um::winbase::LocalFree(out_blob.pbData as *mut _);
+
+        Ok(encrypted_data)
+    }
+}
+
+// Windows DPAPI decrypt function
+fn dpapi_decrypt(encrypted_data: &[u8]) -> Result<Vec<u8>, String> {
+    unsafe {
+        let mut in_blob = DATA_BLOB {
+            cbData: encrypted_data.len() as u32,
+            pbData: encrypted_data.as_ptr() as *mut _,
+        };
+
+        let mut out_blob = DATA_BLOB {
+            cbData: 0,
+            pbData: ptr::null_mut(),
+        };
+
+        let result = CryptUnprotectData(
+            &mut in_blob,
+            ptr::null_mut(), // description
+            ptr::null_mut(), // entropy
+            ptr::null_mut(), // reserved
+            ptr::null_mut(), // prompt struct
+            0,               // flags
+            &mut out_blob,
+        );
+
+        if result == 0 {
+            return Err("DPAPI decryption failed".to_string());
+        }
+
+        let decrypted_data =
+            std::slice::from_raw_parts(out_blob.pbData, out_blob.cbData as usize).to_vec();
+
+        // Free the memory allocated by CryptUnprotectData
+        winapi::um::winbase::LocalFree(out_blob.pbData as *mut _);
+
+        Ok(decrypted_data)
+    }
+}
+
+// Generate or retrieve encryption key with DPAPI protection
+fn get_encryption_key(app_handle: &tauri::AppHandle) -> Result<[u8; 32], String> {
+    let protected_key_path = get_protected_key_path(app_handle)?;
+
+    if protected_key_path.exists() {
+        // Read existing protected key
+        let protected_key_data = fs::read(&protected_key_path)
+            .map_err(|e| format!("Failed to read protected encryption key: {}", e))?;
+
+        // Decrypt key using DPAPI
+        let key_data = dpapi_decrypt(&protected_key_data)?;
 
         if key_data.len() != 32 {
-            return Err("Invalid encryption key".to_string());
+            return Err("Invalid encryption key length after decryption".to_string());
         }
 
         let mut key = [0u8; 32];
@@ -61,9 +146,12 @@ fn get_encryption_key(app_handle: &tauri::AppHandle) -> Result<[u8; 32], String>
         let mut key = [0u8; 32];
         OsRng.fill_bytes(&mut key);
 
-        // Save key to file
-        fs::write(&key_file_path, &key)
-            .map_err(|e| format!("Failed to save encryption key: {}", e))?;
+        // Encrypt key using DPAPI
+        let protected_key = dpapi_encrypt(&key)?;
+
+        // Save protected key to file
+        fs::write(&protected_key_path, &protected_key)
+            .map_err(|e| format!("Failed to save protected encryption key: {}", e))?;
 
         Ok(key)
     }
