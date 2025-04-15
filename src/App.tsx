@@ -8,7 +8,6 @@ import { useClipboardHistory } from "./hooks/useClipboard";
 import { ClipboardHistory } from "./components/clipBoard/clipBoardHistory";
 import { QuickLinkCreator } from "./components/quickLink/quickLinkCreator";
 import { QuickLinkQueryExecutor } from "./components/quickLink/quickLinkQueryExe";
-import { Calculator } from "./components/calculator/calculator";
 
 function App() {
   const [query, setQuery] = useState("");
@@ -402,15 +401,11 @@ function App() {
   };
 
   const isMathCalculation = (query: string): boolean => {
-    // First check if it matches a unit conversion pattern
-    const unitConversionPatterns = [
-      /^\d+(?:\.\d+)?\s*(?:mm|cm|inch|px|rem|em|c|f)\s*to\s*(?:mm|cm|inch|px|rem|em|c|f)$/i,
-    ];
-
-    for (const pattern of unitConversionPatterns) {
-      if (pattern.test(query.trim())) {
-        return true;
-      }
+    // Check if it matches a unit conversion pattern
+    const unitConversionPattern =
+      /^\d+(?:\.\d+)?\s*[a-zA-Z°]+\s*to\s*[a-zA-Z°]+$/i;
+    if (unitConversionPattern.test(query.trim())) {
+      return true;
     }
 
     // If not a unit conversion, check if it's a math calculation
@@ -428,7 +423,6 @@ function App() {
       mathPattern.test(query) && hasDigit && hasOperator && hasOnlyMathChars
     );
   };
-
   const handleCalculatorResult = (result: string | null) => {
     setCalculatorResult(result);
   };
@@ -454,21 +448,16 @@ function App() {
       )}
       <div className="flex-grow overflow-hidden">
         {mode === "apps" ? (
-          <>
-            {isMathCalculation(query) && (
-              <Calculator
-                query={query}
-                onResultAvailable={handleCalculatorResult}
-              />
-            )}
-            <SuggestionList
-              suggestions={displayedSuggestions}
-              selectedIndex={selectedIndex}
-              onSuggestionClick={handleSuggestionClick}
-              onDeleteQuickLink={refreshSuggestions}
-              showFooter={!showCalculatorFooter}
-            />
-          </>
+          <SuggestionList
+            suggestions={displayedSuggestions}
+            selectedIndex={selectedIndex}
+            onSuggestionClick={handleSuggestionClick}
+            onDeleteQuickLink={refreshSuggestions}
+            showFooter={!showCalculatorFooter}
+            query={query}
+            isMathCalculation={isMathCalculation}
+            onResultAvailable={handleCalculatorResult}
+          />
         ) : mode === "clipboard" ? (
           <ClipboardHistory
             history={filteredClipboardHistory}

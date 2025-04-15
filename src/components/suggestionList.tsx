@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Suggestion } from "../types";
 import { SuggestionItem } from "./suggestionItems";
 import { invoke } from "@tauri-apps/api/tauri";
+import { Calculator } from "./calculator/calculator";
 
 type Props = {
   suggestions: Suggestion[];
@@ -9,6 +10,9 @@ type Props = {
   onSuggestionClick: (suggestion: Suggestion) => void;
   onDeleteQuickLink?: () => void;
   showFooter?: boolean;
+  query?: string;
+  isMathCalculation?: (query: string) => boolean;
+  onResultAvailable?: (result: string | null) => void;
 };
 
 type IndexStatus = {
@@ -21,8 +25,12 @@ export function SuggestionList({
   onSuggestionClick,
   onDeleteQuickLink,
   showFooter = true,
+  query = "",
+  isMathCalculation = () => false,
+  onResultAvailable = () => {},
 }: Props) {
   const [isIndexBuilding, setIsIndexBuilding] = useState(false);
+  const isCalculatorQuery = query ? isMathCalculation(query) : false;
 
   // Check if app index is being built initially
   useEffect(() => {
@@ -114,6 +122,13 @@ export function SuggestionList({
 
   return (
     <div className="flex flex-col h-full bg-gray-800">
+      {/* Calculator section - now inside SuggestionList */}
+      {isCalculatorQuery && (
+        <div className="flex-shrink-0">
+          <Calculator query={query} onResultAvailable={onResultAvailable} />
+        </div>
+      )}
+
       {/* Main scrollable area that takes available height */}
       <div className="flex-grow overflow-y-auto">
         {isIndexBuilding ? (

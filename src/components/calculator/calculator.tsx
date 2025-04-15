@@ -6,12 +6,17 @@ type CalculatorProps = {
   onResultAvailable: (result: string | null) => void;
 };
 
-// Define unit conversion types and formulas
-interface UnitConversion {
-  regex: RegExp;
-  convert: (value: number) => { value: number; unit: string };
-  fromUnit: string;
-  toUnit: string;
+// Basic unit types
+type UnitType = "length" | "css" | "temperature" | "weight" | "area" | "volume";
+
+// Interface for unit definitions
+interface UnitDefinition {
+  type: UnitType;
+  names: string[]; // All possible names for this unit (e.g., ["mm", "millimeter", "millimeters"])
+  toBase: (value: number) => number; // Convert from this unit to base unit
+  fromBase: (value: number) => number; // Convert from base unit to this unit
+  precision: number; // Default precision for display
+  symbol: string; // Symbol to display in the result
 }
 
 export function Calculator({ query, onResultAvailable }: CalculatorProps) {
@@ -21,87 +26,220 @@ export function Calculator({ query, onResultAvailable }: CalculatorProps) {
   const [isUnitConversion, setIsUnitConversion] = useState<boolean>(false);
   const [isCopied, setIsCopied] = useState<boolean>(false);
 
-  // Define unit conversion patterns and formulas
-  const unitConversions: UnitConversion[] = [
-    // Length conversions
-    {
-      regex: /^(\d+(?:\.\d+)?)\s*mm\s*to\s*cm$/i,
-      convert: (mm) => ({ value: mm / 10, unit: "cm" }),
-      fromUnit: "mm",
-      toUnit: "cm",
+  // Unit definitions - each with conversion to/from a base unit
+  const unitDefinitions: Record<string, UnitDefinition> = {
+    // Length units (base: mm)
+    mm: {
+      type: "length",
+      names: ["mm", "millimeter", "millimeters"],
+      toBase: (value) => value, // mm is the base unit
+      fromBase: (value) => value,
+      precision: 2,
+      symbol: "mm",
     },
-    {
-      regex: /^(\d+(?:\.\d+)?)\s*cm\s*to\s*mm$/i,
-      convert: (cm) => ({ value: cm * 10, unit: "mm" }),
-      fromUnit: "cm",
-      toUnit: "mm",
+    cm: {
+      type: "length",
+      names: ["cm", "centimeter", "centimeters"],
+      toBase: (value) => value * 10, // 1cm = 10mm
+      fromBase: (value) => value / 10,
+      precision: 2,
+      symbol: "cm",
     },
-    {
-      regex: /^(\d+(?:\.\d+)?)\s*cm\s*to\s*inch$/i,
-      convert: (cm) => ({ value: cm / 2.54, unit: "in" }),
-      fromUnit: "cm",
-      toUnit: "inch",
+    inch: {
+      type: "length",
+      names: ["inch", "inches", "in"],
+      toBase: (value) => value * 25.4, // 1inch = 25.4mm
+      fromBase: (value) => value / 25.4,
+      precision: 2,
+      symbol: "in",
     },
-    {
-      regex: /^(\d+(?:\.\d+)?)\s*inch\s*to\s*cm$/i,
-      convert: (inch) => ({ value: inch * 2.54, unit: "cm" }),
-      fromUnit: "inch",
-      toUnit: "cm",
+    m: {
+      type: "length",
+      names: ["m", "meter", "meters"],
+      toBase: (value) => value * 1000, // 1m = 1000mm
+      fromBase: (value) => value / 1000,
+      precision: 2,
+      symbol: "m",
     },
-    {
-      regex: /^(\d+(?:\.\d+)?)\s*mm\s*to\s*inch$/i,
-      convert: (mm) => ({ value: mm / 25.4, unit: "in" }),
-      fromUnit: "mm",
-      toUnit: "inch",
+    ft: {
+      type: "length",
+      names: ["ft", "foot", "feet"],
+      toBase: (value) => value * 304.8, // 1ft = 304.8mm
+      fromBase: (value) => value / 304.8,
+      precision: 2,
+      symbol: "ft",
     },
-    {
-      regex: /^(\d+(?:\.\d+)?)\s*inch\s*to\s*mm$/i,
-      convert: (inch) => ({ value: inch * 25.4, unit: "mm" }),
-      fromUnit: "inch",
-      toUnit: "mm",
+
+    // CSS units (base: px)
+    px: {
+      type: "css",
+      names: ["px", "pixel", "pixels"],
+      toBase: (value) => value, // px is the base unit
+      fromBase: (value) => value,
+      precision: 0,
+      symbol: "px",
     },
-    // CSS unit conversions
-    {
-      regex: /^(\d+(?:\.\d+)?)\s*px\s*to\s*rem$/i,
-      convert: (px) => ({ value: px / 16, unit: "rem" }),
-      fromUnit: "px",
-      toUnit: "rem",
+    rem: {
+      type: "css",
+      names: ["rem"],
+      toBase: (value) => value * 16, // Assuming 1rem = 16px
+      fromBase: (value) => value / 16,
+      precision: 4,
+      symbol: "rem",
     },
-    {
-      regex: /^(\d+(?:\.\d+)?)\s*px\s*to\s*em$/i,
-      convert: (px) => ({ value: px / 16, unit: "em" }),
-      fromUnit: "px",
-      toUnit: "em",
+    em: {
+      type: "css",
+      names: ["em"],
+      toBase: (value) => value * 16, // Assuming 1em = 16px (same as rem)
+      fromBase: (value) => value / 16,
+      precision: 4,
+      symbol: "em",
     },
-    {
-      regex: /^(\d+(?:\.\d+)?)\s*rem\s*to\s*px$/i,
-      convert: (rem) => ({ value: rem * 16, unit: "px" }),
-      fromUnit: "rem",
-      toUnit: "px",
+    pt: {
+      type: "css",
+      names: ["pt", "point", "points"],
+      toBase: (value) => value * 1.333333, // 1pt ≈ 1.333333px
+      fromBase: (value) => value / 1.333333,
+      precision: 2,
+      symbol: "pt",
     },
-    {
-      regex: /^(\d+(?:\.\d+)?)\s*em\s*to\s*px$/i,
-      convert: (em) => ({ value: em * 16, unit: "px" }),
-      fromUnit: "em",
-      toUnit: "px",
+
+    // Temperature units (no simple base unit conversion)
+    celsius: {
+      type: "temperature",
+      names: ["c", "celsius", "°c"],
+      toBase: (value) => value, // Celsius is base unit
+      fromBase: (value) => value,
+      precision: 1,
+      symbol: "°C",
     },
-    // Temperature conversions
-    {
-      regex: /^(\d+(?:\.\d+)?)\s*c\s*to\s*f$/i,
-      convert: (celsius) => ({ value: (celsius * 9) / 5 + 32, unit: "°F" }),
-      fromUnit: "°C",
-      toUnit: "°F",
+    fahrenheit: {
+      type: "temperature",
+      names: ["f", "fahrenheit", "°f"],
+      toBase: (value) => ((value - 32) * 5) / 9, // Convert to Celsius
+      fromBase: (value) => (value * 9) / 5 + 32, // Convert from Celsius
+      precision: 1,
+      symbol: "°F",
     },
-    {
-      regex: /^(\d+(?:\.\d+)?)\s*f\s*to\s*c$/i,
-      convert: (fahrenheit) => ({
-        value: ((fahrenheit - 32) * 5) / 9,
-        unit: "°C",
-      }),
-      fromUnit: "°F",
-      toUnit: "°C",
+    kelvin: {
+      type: "temperature",
+      names: ["k", "kelvin"],
+      toBase: (value) => value - 273.15, // Convert to Celsius
+      fromBase: (value) => value + 273.15, // Convert from Celsius
+      precision: 1,
+      symbol: "K",
     },
-  ];
+
+    // Weight units (base: g)
+    mg: {
+      type: "weight",
+      names: ["mg", "milligram", "milligrams"],
+      toBase: (value) => value / 1000,
+      fromBase: (value) => value * 1000,
+      precision: 2,
+      symbol: "mg",
+    },
+    g: {
+      type: "weight",
+      names: ["g", "gram", "grams"],
+      toBase: (value) => value,
+      fromBase: (value) => value,
+      precision: 2,
+      symbol: "g",
+    },
+    kg: {
+      type: "weight",
+      names: ["kg", "kilogram", "kilograms"],
+      toBase: (value) => value * 1000,
+      fromBase: (value) => value / 1000,
+      precision: 2,
+      symbol: "kg",
+    },
+    oz: {
+      type: "weight",
+      names: ["oz", "ounce", "ounces"],
+      toBase: (value) => value * 28.3495,
+      fromBase: (value) => value / 28.3495,
+      precision: 2,
+      symbol: "oz",
+    },
+    lb: {
+      type: "weight",
+      names: ["lb", "pound", "pounds"],
+      toBase: (value) => value * 453.592,
+      fromBase: (value) => value / 453.592,
+      precision: 2,
+      symbol: "lb",
+    },
+  };
+
+  // Create a mapping of unit names to unit keys
+  const getUnitKeyFromName = (name: string): string | null => {
+    name = name.toLowerCase();
+    for (const [key, unit] of Object.entries(unitDefinitions)) {
+      if (unit.names.includes(name)) {
+        return key;
+      }
+    }
+    return null;
+  };
+
+  // Function to detect and parse unit conversion requests
+  const parseUnitConversion = (
+    input: string
+  ): { value: number; fromUnit: string; toUnit: string } | null => {
+    // Try to match the pattern: number + unit + "to" + unit
+    const match = input.match(
+      /^(\d+(?:\.\d+)?)\s*([a-zA-Z°]+)\s*to\s*([a-zA-Z°]+)$/i
+    );
+    if (!match) return null;
+
+    const value = parseFloat(match[1]);
+    const fromUnitName = match[2].toLowerCase();
+    const toUnitName = match[3].toLowerCase();
+
+    const fromUnitKey = getUnitKeyFromName(fromUnitName);
+    const toUnitKey = getUnitKeyFromName(toUnitName);
+
+    if (!fromUnitKey || !toUnitKey) return null;
+
+    return {
+      value,
+      fromUnit: fromUnitKey,
+      toUnit: toUnitKey,
+    };
+  };
+
+  // Function to perform the unit conversion
+  const convertUnits = (
+    value: number,
+    fromUnit: string,
+    toUnit: string
+  ): {
+    value: number;
+    fromSymbol: string;
+    toSymbol: string;
+    precision: number;
+  } | null => {
+    const fromUnitDef = unitDefinitions[fromUnit];
+    const toUnitDef = unitDefinitions[toUnit];
+
+    if (!fromUnitDef || !toUnitDef) return null;
+
+    // Units must be of the same type (except for temperature which has special rules)
+    if (fromUnitDef.type !== toUnitDef.type) return null;
+
+    // Convert from the input unit to base, then from base to target unit
+    const valueInBase = fromUnitDef.toBase(value);
+    const convertedValue = toUnitDef.fromBase(valueInBase);
+
+    return {
+      value: convertedValue,
+      fromSymbol: fromUnitDef.symbol,
+      toSymbol: toUnitDef.symbol,
+      precision: toUnitDef.precision,
+    };
+  };
 
   useEffect(() => {
     try {
@@ -112,28 +250,30 @@ export function Calculator({ query, onResultAvailable }: CalculatorProps) {
       if (!expression) return;
 
       // First, check if this is a unit conversion request
-      for (const conversion of unitConversions) {
-        const match = expression.match(conversion.regex);
-        if (match) {
-          // We found a matching unit conversion pattern
-          const inputValue = parseFloat(match[1]);
-          const { value: convertedValue, unit } =
-            conversion.convert(inputValue);
+      const conversionRequest = parseUnitConversion(expression);
+      if (conversionRequest) {
+        const { value, fromUnit, toUnit } = conversionRequest;
+        const conversion = convertUnits(value, fromUnit, toUnit);
 
-          // Format the result based on the type of unit
-          // For most length units, show 2 decimal places
-          // For px to rem/em conversions, show 4 decimal places
-          const precision = unit === "rem" || unit === "em" ? 4 : 2;
+        if (conversion) {
+          const {
+            value: convertedValue,
+            fromSymbol,
+            toSymbol,
+            precision,
+          } = conversion;
+
+          // Format the result with the appropriate precision
           const formattedResult = convertedValue.toFixed(precision);
 
           // Set display values
-          setFromValue(`${inputValue} ${conversion.fromUnit}`);
-          setToValue(`${formattedResult} ${unit}`);
-          setResult(`${formattedResult} ${unit}`);
+          setFromValue(`${value} ${fromSymbol}`);
+          setToValue(`${formattedResult} ${toSymbol}`);
+          setResult(`${formattedResult} ${toSymbol}`);
           setIsUnitConversion(true);
 
           // Notify parent component about the result
-          onResultAvailable(`${formattedResult} ${unit}`);
+          onResultAvailable(`${formattedResult} ${toSymbol}`);
 
           // Reset copied state
           setIsCopied(false);
