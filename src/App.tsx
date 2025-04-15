@@ -402,6 +402,18 @@ function App() {
   };
 
   const isMathCalculation = (query: string): boolean => {
+    // First check if it matches a unit conversion pattern
+    const unitConversionPatterns = [
+      /^\d+(?:\.\d+)?\s*(?:mm|cm|inch|px|rem|em|c|f)\s*to\s*(?:mm|cm|inch|px|rem|em|c|f)$/i,
+    ];
+
+    for (const pattern of unitConversionPatterns) {
+      if (pattern.test(query.trim())) {
+        return true;
+      }
+    }
+
+    // If not a unit conversion, check if it's a math calculation
     // Check if the query contains numeric values and mathematical operators
     const mathPattern = /[\d+\-*/.()\s]+/;
 
