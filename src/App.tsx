@@ -31,6 +31,13 @@ function App() {
   const isClearing = useRef(false);
   const lastFetchTime = useRef(0);
 
+  // In App.tsx, define constants for window sizes at the top
+  const WINDOW_SIZES = {
+    apps: { width: 750, height: 500 },
+    clipboard: { width: 900, height: 700 },
+    create_quick_link: { width: 750, height: 600 },
+  };
+
   const {
     clipboardHistory,
     copyToClipboard,
@@ -45,6 +52,13 @@ function App() {
           item.text.toLowerCase().includes(query.toLowerCase())
         )
       : clipboardHistory;
+
+  const resizeWindowForMode = (
+    mode: "apps" | "clipboard" | "create_quick_link"
+  ) => {
+    const size = WINDOW_SIZES[mode];
+    invoke("resize_window", { width: size.width, height: size.height });
+  };
 
   const fetchRecentApps = async (force = false) => {
     try {
@@ -78,6 +92,8 @@ function App() {
 
   // Initial setup
   useEffect(() => {
+    //set width and height for the windows
+    resizeWindowForMode("apps");
     // Force a fresh load of recent apps
     fetchRecentApps(true);
 
@@ -87,7 +103,7 @@ function App() {
         setMode("clipboard");
         setQuery("");
         setResetTrigger((prev) => prev + 1);
-        invoke("resize_window", { width: 900, height: 700 });
+        resizeWindowForMode("clipboard");
       }
     };
 
@@ -178,7 +194,7 @@ function App() {
         if (e.key === "Enter") {
           // Use integrated quick link creator instead of popup
           setMode("create_quick_link");
-          invoke("resize_window", { width: 750, height: 630 });
+          resizeWindowForMode("clipboard");
         }
       };
 
@@ -275,7 +291,7 @@ function App() {
 
     if (mode === "create_quick_link") {
       setMode("apps");
-      invoke("resize_window", { width: 750, height: 500 });
+      resizeWindowForMode("apps");
       return;
     }
 
@@ -287,7 +303,7 @@ function App() {
 
     if (mode === "clipboard") {
       setMode("apps");
-      invoke("resize_window", { width: 750, height: 500 });
+      resizeWindowForMode("apps");
       return;
     }
 
@@ -298,7 +314,7 @@ function App() {
     setMode("apps");
     setQuery("");
     setResetTrigger((prev) => prev + 1);
-    invoke("resize_window", { width: 750, height: 500 });
+    resizeWindowForMode("apps");
   };
 
   const openSelectedApp = async () => {
@@ -365,7 +381,7 @@ function App() {
     setMode("apps");
     setQuery("");
     setResetTrigger((prev) => prev + 1);
-    invoke("resize_window", { width: 750, height: 500 });
+    resizeWindowForMode("apps");
   };
 
   const executeQuickLinkWithQuery = async (finalCommand: string) => {
@@ -384,9 +400,12 @@ function App() {
 
   useEffect(() => {
     if (mode === "clipboard") {
+      resizeWindowForMode("clipboard");
       setSelectedIndex(filteredClipboardHistory.length > 0 ? 0 : -1);
+    } else if (mode === "create_quick_link") {
+      resizeWindowForMode("create_quick_link");
     }
-  }, [query, mode, filteredClipboardHistory.length]);
+  }, [mode, filteredClipboardHistory.length]);
 
   const refreshSuggestions = async () => {
     setSelectedIndex(0);

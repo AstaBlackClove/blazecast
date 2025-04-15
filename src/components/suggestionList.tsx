@@ -130,7 +130,7 @@ export function SuggestionList({
       )}
 
       {/* Main scrollable area that takes available height */}
-      <div className="flex-grow overflow-y-auto">
+      <div className="flex-grow overflow-y-auto overflow-x-hidden">
         {isIndexBuilding ? (
           <div className="flex justify-center items-center h-full">
             <div className="text-gray-500 text-center py-8">
