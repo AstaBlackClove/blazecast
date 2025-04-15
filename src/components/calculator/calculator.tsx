@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { ChevronRight } from "lucide-react";
+import { evaluate } from "mathjs";
 
 type CalculatorProps = {
   query: string;
@@ -319,7 +320,7 @@ export function Calculator({ query, onResultAvailable }: CalculatorProps) {
 
           // Evaluate the expression
           // eslint-disable-next-line no-eval
-          return eval(sanitizedExpr);
+          return evaluate(sanitizedExpr);
         } catch (e) {
           console.error("Calculator evaluation error:", e);
           return null;
