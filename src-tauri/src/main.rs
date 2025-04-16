@@ -33,11 +33,18 @@ fn schedule_index_updates(app_index_state: Arc<Mutex<AppIndex>>) {
             let temp_state = AppIndexState {
                 index: app_index_state.clone(),
             };
-            println!("App refresh called"); 
+            println!("App refresh called");
             // Refresh the index
             commands::fetch_app::app_index::refresh_app_index(&temp_state);
         }
     });
+}
+
+pub fn show_window_clipboard_mode(window: tauri::Window) {
+    window.show().unwrap();
+    window.set_focus().unwrap();
+    // We'll send an event to the frontend to switch to clipboard mode
+    window.emit("switch-to-clipboard", {}).unwrap();
 }
 
 fn main() {
@@ -119,6 +126,23 @@ fn main() {
                     } else {
                         window.show().unwrap();
                         window.set_focus().unwrap();
+                    }
+                })
+                .unwrap();
+
+            // Register new global shortcut for clipboard mode (Alt+Shift+C)
+            let clipboard_app_handle = app.handle();
+            clipboard_app_handle
+                .global_shortcut_manager()
+                .register("Alt+Shift+C", move || {
+                    let window = clipboard_app_handle.get_window("main").unwrap();
+                    if window.is_visible().unwrap() {
+                        window.hide().unwrap();
+                    } else {
+                        // Show window and notify frontend to switch to clipboard mode
+                        window.show().unwrap();
+                        window.set_focus().unwrap();
+                        window.emit("switch-to-clipboard", {}).unwrap();
                     }
                 })
                 .unwrap();

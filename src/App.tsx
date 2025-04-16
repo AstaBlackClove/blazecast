@@ -8,6 +8,7 @@ import { useClipboardHistory } from "./hooks/useClipboard";
 import { ClipboardHistory } from "./components/clipBoard/clipBoardHistory";
 import { QuickLinkCreator } from "./components/quickLink/quickLinkCreator";
 import { QuickLinkQueryExecutor } from "./components/quickLink/quickLinkQueryExe";
+import { listen } from "@tauri-apps/api/event";
 
 function App() {
   const [query, setQuery] = useState("");
@@ -107,6 +108,14 @@ function App() {
       }
     };
 
+    // Listen for the Tauri event to switch to clipboard mode
+    const unlisten = listen("switch-to-clipboard", () => {
+      setMode("clipboard");
+      setQuery("");
+      setResetTrigger((prev) => prev + 1);
+      resizeWindowForMode("clipboard");
+    });
+
     window.addEventListener("keydown", handleShortcut);
 
     // Add focus event listener to refresh recent apps when window gains focus
@@ -116,6 +125,7 @@ function App() {
     return () => {
       window.removeEventListener("keydown", handleShortcut);
       window.removeEventListener("focus", handleFocus);
+      unlisten.then(unlistenFn => unlistenFn());
     };
   }, []);
 
