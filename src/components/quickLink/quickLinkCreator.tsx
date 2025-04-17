@@ -174,7 +174,7 @@ export function QuickLinkCreator({
   }, []);
 
   return (
-    <div className="flex flex-col w-full h-full bg-gray-800 rounded-xl">
+    <div className="flex flex-col w-full h-full bg-gray-900 rounded-xl">
       {/* Header - Fixed at top */}
       <div className="flex items-center p-4 border-b border-gray-700">
         <button onClick={onClose} className="p-2 mr-3 bg-gray-700 rounded-full">

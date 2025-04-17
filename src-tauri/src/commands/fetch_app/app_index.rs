@@ -1,6 +1,9 @@
+use uuid::Uuid;
+
+use crate::commands::fetch_app::icons::extract_icon;
 use std::fs::{self, File};
 use std::io::{Read, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::SystemTime;
@@ -10,11 +13,103 @@ use crate::commands::fetch_app::{
     models::{AppIndex, AppIndexState},
 };
 
+use super::categorization::categorize_app;
+use super::models::AppInfo;
+
 // Function to get the index file path
 pub fn get_index_path() -> PathBuf {
     let mut path = tauri::api::path::app_data_dir(&tauri::Config::default()).unwrap();
     path.push("app_index.json");
     path
+}
+
+pub fn add_manual_app(name: String, path: String) -> Result<AppInfo, String> {
+    println!("Triggered");
+    // Validate basic path existence - this is a bit tricky with args
+    let path_parts: Vec<&str> = path.split_whitespace().collect();
+    let exe_path = path_parts[0];
+
+    // Remove quotes if present
+    let exe_path = exe_path.trim_matches('"');
+
+    if !Path::new(exe_path).exists() {
+        return Err(format!("Executable path does not exist: {}", exe_path));
+    }
+
+    // Load the current app index
+    let mut index = load_app_index();
+
+    // Check for duplicates by path or name
+    let mut existing_id = None;
+    for (id, app) in &index.apps {
+        // Check if the path (without arguments) or the exact path match
+        let app_exe_path = app
+            .path
+            .split_whitespace()
+            .next()
+            .unwrap_or("")
+            .trim_matches('"');
+        if app_exe_path == exe_path || app.path == path {
+            existing_id = Some(id.clone());
+            break;
+        }
+
+        // Optional: Also check by name if you want to prevent duplicate names
+        if app.name.to_lowercase() == name.to_lowercase() {
+            existing_id = Some(id.clone());
+            break;
+        }
+    }
+
+    // Extract icon from the executable path
+    let icon = extract_icon(exe_path).unwrap_or_default();
+
+    // Categorize the app
+    let category = categorize_app(exe_path, &name);
+
+    // If a duplicate exists, update that entry instead of creating a new one
+    if let Some(id) = existing_id {
+        let app_info = AppInfo {
+            id: id.clone(),
+            name,
+            path, // Store the full path with arguments
+            icon,
+            category,
+            // Preserve access statistics
+            last_accessed: index.apps.get(&id).and_then(|app| app.last_accessed),
+            access_count: index.apps.get(&id).map_or(0, |app| app.access_count),
+        };
+
+        // Update the existing entry
+        index.apps.insert(id, app_info.clone());
+
+        // Save the updated index
+        save_app_index(&index)?;
+
+        return Ok(app_info);
+    }
+
+    // No duplicate found, generate a new UUID for the app
+    let id = Uuid::new_v4().to_string();
+
+    // Create the new app info
+    let app_info = AppInfo {
+        id: id.clone(),
+        name,
+        path, // Store the full path with arguments
+        icon,
+        category,
+        last_accessed: None,
+        access_count: 0,
+    };
+
+    // Add the new app to the index
+    index.apps.insert(id, app_info.clone());
+
+    // Save the updated index
+    save_app_index(&index)?;
+
+    Ok(app_info)
 }
 
 // Load the app index from disk

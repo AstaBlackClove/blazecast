@@ -21,7 +21,6 @@ export function useSuggestions(query: string): Suggestion[] {
       const quickLinkKeywords = [
         "cre",
         "create",
-        "add",
         "new",
         "link",
         "quicklink",
@@ -29,11 +28,17 @@ export function useSuggestions(query: string): Suggestion[] {
       ];
 
       const refreshKeyword = ["re", "refresh", "reload"];
+      const addManualAppSuggestion = ["add", "manualentry", "appentry"];
+
       const shouldShowQuickLink = quickLinkKeywords.some((keyword) =>
         trimmedQuery.toLowerCase().includes(keyword)
       );
 
       const shouldShowRefresh = refreshKeyword.some((keyword) =>
+        trimmedQuery.toLowerCase().includes(keyword)
+      );
+
+      const shouldShowManualApp = addManualAppSuggestion.some((keyword) =>
         trimmedQuery.toLowerCase().includes(keyword)
       );
 
@@ -61,6 +66,17 @@ export function useSuggestions(query: string): Suggestion[] {
               console.error("Failed to refresh app index:", error);
             }
           },
+        });
+      }
+
+      if (shouldShowManualApp) {
+        results.push({
+          id: "add_manual_app",
+          title: "Add Application Manually",
+          subtitle:
+            "Add custom applications that weren't detected automatically",
+          icon: "➕",
+          category: "System",
         });
       }
 

@@ -9,14 +9,15 @@ import { ClipboardHistory } from "./components/clipBoard/clipBoardHistory";
 import { QuickLinkCreator } from "./components/quickLink/quickLinkCreator";
 import { QuickLinkQueryExecutor } from "./components/quickLink/quickLinkQueryExe";
 import { listen } from "@tauri-apps/api/event";
+import { ManualAppEntry } from "./components/manualAppEntry/ManualAppEntry";
 
 function App() {
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [recentApps, setRecentApps] = useState<any>([]);
-  const [mode, setMode] = useState<"apps" | "clipboard" | "create_quick_link">(
-    "apps"
-  );
+  const [mode, setMode] = useState<
+    "apps" | "clipboard" | "create_quick_link" | "add_manual_app"
+  >("apps");
   const [resetTrigger, setResetTrigger] = useState(0);
   const [calculatorResult, setCalculatorResult] = useState<string | null>(null);
   const [showCalculatorCopied, setShowCalculatorCopied] = useState(false);
@@ -37,6 +38,7 @@ function App() {
     apps: { width: 750, height: 500 },
     clipboard: { width: 900, height: 700 },
     create_quick_link: { width: 750, height: 600 },
+    add_manual_app: { width: 750, height: 600 },
   };
 
   const {
@@ -55,7 +57,7 @@ function App() {
       : clipboardHistory;
 
   const resizeWindowForMode = (
-    mode: "apps" | "clipboard" | "create_quick_link"
+    mode: "apps" | "clipboard" | "create_quick_link" | "add_manual_app"
   ) => {
     const size = WINDOW_SIZES[mode];
     invoke("resize_window", { width: size.width, height: size.height });
@@ -125,7 +127,7 @@ function App() {
     return () => {
       window.removeEventListener("keydown", handleShortcut);
       window.removeEventListener("focus", handleFocus);
-      unlisten.then(unlistenFn => unlistenFn());
+      unlisten.then((unlistenFn) => unlistenFn());
     };
   }, []);
 
@@ -215,6 +217,27 @@ function App() {
     }
   }, [suggestions, selectedIndex]);
 
+  // Add this effect to handle manual app entry selection via keyboard
+  useEffect(() => {
+    const manualAppEntry = suggestions.find((s) => s.id === "add_manual_app");
+    if (
+      manualAppEntry &&
+      selectedIndex === suggestions.indexOf(manualAppEntry)
+    ) {
+      const handleManualAppEntry = (e: KeyboardEvent) => {
+        if (e.key === "Enter") {
+          // Switch to manual app entry mode
+          setMode("add_manual_app");
+          resizeWindowForMode("add_manual_app");
+        }
+      };
+      window.addEventListener("keydown", handleManualAppEntry);
+      return () => {
+        window.removeEventListener("keydown", handleManualAppEntry);
+      };
+    }
+  }, [suggestions, selectedIndex]);
+
   const displayedSuggestions: any =
     query.trim() === "" ? recentApps : suggestions;
 
@@ -299,7 +322,7 @@ function App() {
       return;
     }
 
-    if (mode === "create_quick_link") {
+    if (mode === "create_quick_link" || mode === "add_manual_app") {
       setMode("apps");
       resizeWindowForMode("apps");
       return;
@@ -318,6 +341,16 @@ function App() {
     }
 
     invoke("hide_window");
+  };
+
+  // Add a function to handle saving a manual app
+  const handleManualAppSave = async () => {
+    setMode("apps");
+    setQuery("");
+    setResetTrigger((prev) => prev + 1);
+    resizeWindowForMode("apps");
+    // Force refresh recent apps to include the newly added app
+    await fetchRecentApps(true);
   };
 
   const handleBackToApps = () => {
@@ -462,7 +495,7 @@ function App() {
 
   return (
     <div className="flex flex-col w-full h-full rounded-xl overflow-hidden border border-gray-700">
-      {mode !== "create_quick_link" && (
+      {mode !== "create_quick_link" && mode !== "add_manual_app" && (
         <CommandInput
           query={query}
           onQueryChange={handleQueryChange}
@@ -501,6 +534,11 @@ function App() {
           <QuickLinkCreator
             onClose={handleBackToApps}
             onSave={handleQuickLinkSave}
+          />
+        ) : mode === "add_manual_app" ? (
+          <ManualAppEntry
+            onClose={handleBackToApps}
+            onSave={handleManualAppSave}
           />
         ) : null}
       </div>

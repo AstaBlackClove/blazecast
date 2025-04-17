@@ -5,6 +5,8 @@ use crate::commands::fetch_app::{
     models::{AppIndexState, AppInfo},
 };
 
+use super::app_index::add_manual_app;
+
 #[tauri::command]
 pub async fn get_index_status(
     app_index_state: State<'_, AppIndexState>,
@@ -102,9 +104,12 @@ pub async fn get_recent_apps(
 }
 
 #[tauri::command]
-pub async fn refresh_app_index(
-    app_index_state: State<'_, AppIndexState>,
-) -> Result<(), String> {
+pub fn add_manual_application(name: String, path: String) -> Result<AppInfo, String> {
+    add_manual_app(name, path)
+}
+
+#[tauri::command]
+pub async fn refresh_app_index(app_index_state: State<'_, AppIndexState>) -> Result<(), String> {
     // Start background refresh
     crate::commands::fetch_app::app_index::refresh_app_index(&app_index_state);
     Ok(())
@@ -118,20 +123,24 @@ pub async fn open_app(
 ) -> Result<(), String> {
     println!("Opening app with ID: {}", app_id);
 
-    // Get the app path
-    let path = {
+    // Get the app path and check if it's Discord
+    let (path, is_discord) = {
         let mut index = app_index_state.index.lock().unwrap();
         let app = index
             .apps
             .get(&app_id)
             .ok_or_else(|| format!("App not found with ID: {}", app_id))?;
+
         let path = app.path.clone();
+        // Check if this is Discord by looking for "Discord" in the path
+        let is_discord =
+            path.to_lowercase().contains("discord") && path.to_lowercase().contains("update.exe");
 
         // Record this access
         record_app_access(&mut index, &app_id);
-
-        path
+        (path, is_discord)
     };
+
     println!("Launching app at path: {}", path);
 
     // Use WinAPI on Windows, fallback to std::process on other platforms
@@ -150,48 +159,90 @@ pub async fn open_app(
             .parent()
             .ok_or_else(|| "Could not determine application directory".to_string())?;
 
-        // Convert path and directory to wide string format required by WinAPI
-        let wide_path: Vec<u16> = OsStr::new(&path).encode_wide().chain(once(0)).collect();
+        if is_discord {
+            // For Discord, we need to launch update.exe with the --processStart Discord.exe argument
+            let args = "--processStart Discord.exe";
 
-        let wide_dir: Vec<u16> = OsStr::new(dir).encode_wide().chain(once(0)).collect();
+            // Convert path, directory and args to wide string format required by WinAPI
+            let wide_path: Vec<u16> = OsStr::new(&path).encode_wide().chain(once(0)).collect();
+            let wide_dir: Vec<u16> = OsStr::new(dir).encode_wide().chain(once(0)).collect();
+            let wide_args: Vec<u16> = OsStr::new(args).encode_wide().chain(once(0)).collect();
 
-        // "open" verb as wide string
-        let operation = "open\0".encode_utf16().collect::<Vec<u16>>();
+            // "open" verb as wide string
+            let operation: Vec<u16> = "open\0".encode_utf16().collect();
 
-        // ShellExecuteW returns instance handle (greater than 32 means success)
-        let result = unsafe {
-            ShellExecuteW(
-                ptr::null_mut(),    // No parent window
-                operation.as_ptr(), // Operation to perform
-                wide_path.as_ptr(), // File to execute
-                ptr::null(),        // No parameters
-                wide_dir.as_ptr(),  // Working directory - set to app's directory
-                SW_SHOW,            // Show command
-            )
-        };
+            // ShellExecuteW returns instance handle (greater than 32 means success)
+            let result = unsafe {
+                ShellExecuteW(
+                    ptr::null_mut(),    // No parent window
+                    operation.as_ptr(), // Operation to perform
+                    wide_path.as_ptr(), // File to execute
+                    wide_args.as_ptr(), // Parameters - Discord needs these
+                    wide_dir.as_ptr(),  // Working directory - set to app's directory
+                    SW_SHOW,            // Show command
+                )
+            };
 
-        // Check if the operation was successful
-        if result as isize <= 32 {
-            return Err(format!(
-                "Failed to launch app via WinAPI: error code {}",
-                result as isize
-            ));
+            // Check if the operation was successful
+            if result as isize <= 32 {
+                return Err(format!(
+                    "Failed to launch Discord via WinAPI: error code {}",
+                    result as isize
+                ));
+            }
+        } else {
+            // Standard app launch without parameters
+            let wide_path: Vec<u16> = OsStr::new(&path).encode_wide().chain(once(0)).collect();
+            let wide_dir: Vec<u16> = OsStr::new(dir).encode_wide().chain(once(0)).collect();
+
+            // "open" verb as wide string
+            let operation: Vec<u16> = "open\0".encode_utf16().collect();
+
+            // ShellExecuteW returns instance handle (greater than 32 means success)
+            let result = unsafe {
+                ShellExecuteW(
+                    ptr::null_mut(),    // No parent window
+                    operation.as_ptr(), // Operation to perform
+                    wide_path.as_ptr(), // File to execute
+                    ptr::null(),        // No parameters
+                    wide_dir.as_ptr(),  // Working directory - set to app's directory
+                    SW_SHOW,            // Show command
+                )
+            };
+
+            // Check if the operation was successful
+            if result as isize <= 32 {
+                return Err(format!(
+                    "Failed to launch app via WinAPI: error code {}",
+                    result as isize
+                ));
+            }
         }
-
         Ok(())
     }
 
     #[cfg(not(target_os = "windows"))]
     {
-        // For non-Windows platforms, set the working directory
+        // For non-Windows platforms
         let dir = std::path::Path::new(&path)
             .parent()
             .ok_or_else(|| "Could not determine application directory".to_string())?;
 
-        std::process::Command::new(&path)
-            .current_dir(dir) // Set the working directory to the app's directory
-            .spawn()
-            .map_err(|e| format!("Failed to launch app: {}", e))?;
+        if is_discord {
+            // For Discord on non-Windows platforms, launch with appropriate args
+            std::process::Command::new(&path)
+                .arg("--processStart")
+                .arg("Discord.exe")
+                .current_dir(dir) // Set the working directory to the app's directory
+                .spawn()
+                .map_err(|e| format!("Failed to launch Discord: {}", e))?;
+        } else {
+            // Standard app launch
+            std::process::Command::new(&path)
+                .current_dir(dir) // Set the working directory to the app's directory
+                .spawn()
+                .map_err(|e| format!("Failed to launch app: {}", e))?;
+        }
         Ok(())
     }
 }

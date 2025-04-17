@@ -13,8 +13,8 @@ use commands::clip_board::{
     pin_clipboard_item, save_clipboard_history, set_clipboard,
 };
 use commands::fetch_app::{
-    get_index_status, get_recent_apps, hide_window, init_app_index, open_app, refresh_app_index,
-    search_apps,
+    add_manual_application, get_index_status, get_recent_apps, hide_window, init_app_index,
+    open_app, refresh_app_index, search_apps,
 };
 use commands::quick_link::{
     check_vscode_path, delete_quick_link, execute_quick_link, execute_quick_link_with_command,
@@ -100,7 +100,8 @@ fn main() {
             get_open_with_suggestions,
             check_vscode_path,
             get_default_browser,
-            refresh_app_index
+            refresh_app_index,
+            add_manual_application
         ])
         .setup(|app| {
             // Initialize quick links
