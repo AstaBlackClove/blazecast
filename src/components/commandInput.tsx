@@ -106,7 +106,7 @@ export function CommandInput({
         placeholder={
           showBackButton
             ? "Clipboard history..."
-            : "Search for apps and commands or type 'clip' for clipboard..."
+            : "Search for apps and commands or type 'quick' for quick link creation..."
         }
         className="w-full p-3 rounded-xl bg-white/5 backdrop-blur-none text-white placeholder-white/50 focus:outline-none focus:ring-2 transition-all duration-300 ease-in-out focus:bg-white/10 focus:backdrop-blur-md"
       />

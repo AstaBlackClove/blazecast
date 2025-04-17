@@ -13,6 +13,7 @@ use crate::commands::fetch_app::{
     models::{AppIndex, AppIndexState},
 };
 
+use super::app_registry::parse_shortcut;
 use super::categorization::categorize_app;
 use super::models::AppInfo;
 
@@ -24,15 +25,15 @@ pub fn get_index_path() -> PathBuf {
 }
 
 pub fn add_manual_app(name: String, path: String) -> Result<AppInfo, String> {
-    println!("Triggered");
     // Validate basic path existence - this is a bit tricky with args
     let path_parts: Vec<&str> = path.split_whitespace().collect();
-    let exe_path = path_parts[0];
+    let exe_path = if path.to_lowercase().ends_with(".lnk") {
+        parse_shortcut(Path::new(&path))?
+    } else {
+        path_parts[0].trim_matches('"').to_string()
+    };
 
-    // Remove quotes if present
-    let exe_path = exe_path.trim_matches('"');
-
-    if !Path::new(exe_path).exists() {
+    if !Path::new(&exe_path).exists() {
         return Err(format!("Executable path does not exist: {}", exe_path));
     }
 
@@ -62,10 +63,10 @@ pub fn add_manual_app(name: String, path: String) -> Result<AppInfo, String> {
     }
 
     // Extract icon from the executable path
-    let icon = extract_icon(exe_path).unwrap_or_default();
+    let icon = extract_icon(&exe_path).unwrap_or_default();
 
     // Categorize the app
-    let category = categorize_app(exe_path, &name);
+    let category = categorize_app(&exe_path, &name);
 
     // If a duplicate exists, update that entry instead of creating a new one
     if let Some(id) = existing_id {

@@ -171,7 +171,7 @@ fn should_skip_app(name: &str, path: &str) -> bool {
 }
 
 /// Parses a .lnk shortcut file using the COM ShellLink API.
-fn parse_shortcut(shortcut_path: &Path) -> Result<String, String> {
+pub fn parse_shortcut(shortcut_path: &Path) -> Result<String, String> {
     unsafe {
         // Initialize COM in a single-threaded apartment.
         CoInitializeEx(Some(std::ptr::null_mut()), COINIT_APARTMENTTHREADED)

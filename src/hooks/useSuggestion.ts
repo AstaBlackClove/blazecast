@@ -19,6 +19,8 @@ export function useSuggestions(query: string): Suggestion[] {
 
       // Check for quick link creation keywords
       const quickLinkKeywords = [
+        'q',
+        'qui',
         "cre",
         "create",
         "new",
@@ -94,6 +96,7 @@ export function useSuggestions(query: string): Suggestion[] {
             icon: app.icon,
             action: async () => {
               try {
+                console.log("From useSugggestion.tsx")
                 await invoke("open_app", { appId: app.id });
               } catch (error) {
                 console.error(`Failed to open ${app.name}:`, error);

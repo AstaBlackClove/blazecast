@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/tauri";
 import { CommandInput } from "./components/commandInput";
 import { SuggestionList } from "./components/suggestionList";
@@ -33,12 +33,11 @@ function App() {
   const isClearing = useRef(false);
   const lastFetchTime = useRef(0);
 
-  // In App.tsx, define constants for window sizes at the top
   const WINDOW_SIZES = {
     apps: { width: 750, height: 500 },
     clipboard: { width: 900, height: 700 },
     create_quick_link: { width: 750, height: 600 },
-    add_manual_app: { width: 750, height: 600 },
+    add_manual_app: { width: 750, height: 450 },
   };
 
   const {
@@ -80,6 +79,7 @@ function App() {
       const recentSuggestions = apps.map((app) => ({
         ...appToSuggestion(app),
         action: async () => {
+          console.log("From App.tsx");
           // Ensure we're opening the correct app by ID
           await invoke("open_app", { appId: app.id });
           return false; // No modal opened
@@ -243,6 +243,7 @@ function App() {
 
   const handleQueryChange = (newQuery: string) => {
     setQuery(newQuery);
+    setSelectedIndex(0);
   };
 
   const handleSubmit = async () => {
@@ -356,6 +357,7 @@ function App() {
   const handleBackToApps = () => {
     setMode("apps");
     setQuery("");
+    setSelectedIndex(0);
     setResetTrigger((prev) => prev + 1);
     resizeWindowForMode("apps");
   };
@@ -381,25 +383,30 @@ function App() {
     }
   };
 
-  const handleSuggestionClick = async (suggestion: any) => {
-    if (suggestion?.action) {
-      try {
-        // Execute the action and check if it opens a modal
-        const opensModal = await suggestion.action();
+  const handleSuggestionClick = useMemo(() => {
+    let isExecuting = false;
+    return async (suggestion: any) => {
+      if (isExecuting) return;
+      isExecuting = true;
 
-        // Only hide window if not opening a modal
-        if (!opensModal) {
-          await invoke("hide_window");
-          setQuery("");
-          setResetTrigger((prev) => prev + 1);
-          // Force refresh recent apps for next time
-          await fetchRecentApps(true);
+      console.log(suggestion);
+      if (suggestion?.action) {
+        try {
+          const opensModal = await suggestion.action();
+          if (!opensModal) {
+            await invoke("hide_window");
+            setQuery("");
+            setResetTrigger((prev) => prev + 1);
+            await fetchRecentApps(true);
+          }
+        } catch (error) {
+          console.error(error);
+        } finally {
+          isExecuting = false;
         }
-      } catch (error) {
-        console.error(error);
       }
-    }
-  };
+    };
+  }, []);
 
   const handleCopyFromHistory = async (text: string) => {
     const success = await copyToClipboard(text);
