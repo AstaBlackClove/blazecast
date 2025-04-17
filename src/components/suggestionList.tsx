@@ -6,7 +6,10 @@ import { Calculator } from "./calculator/calculator";
 
 type Props = {
   suggestions: Suggestion[];
-  selectedIndex: number;
+  groupedSuggestions: Record<string, Suggestion[]>;
+  selectedIndex: number; // Keep for backward compatibility
+  selectedCategory: string | null;
+  selectedItemInCategory: number;
   onSuggestionClick: (suggestion: Suggestion) => void;
   onDeleteQuickLink?: () => void;
   showFooter?: boolean;
@@ -21,7 +24,10 @@ type IndexStatus = {
 
 export function SuggestionList({
   suggestions,
+  groupedSuggestions,
   selectedIndex,
+  selectedCategory,
+  selectedItemInCategory,
   onSuggestionClick,
   onDeleteQuickLink,
   showFooter = true,
@@ -78,34 +84,7 @@ export function SuggestionList({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [suggestions, selectedIndex]);
 
-  // Group suggestions by category
-  const groupedSuggestions = suggestions.reduce<Record<string, Suggestion[]>>(
-    (acc, suggestion) => {
-      const category = suggestion.category || "Other";
-      if (!acc[category]) {
-        acc[category] = [];
-      }
-      acc[category].push(suggestion);
-      return acc;
-    },
-    {}
-  );
-
   const isEmpty = suggestions.length === 0;
-
-  // Function to get the actual index in the flat array
-  const getAbsoluteIndex = (
-    categoryIndex: number,
-    itemIndex: number
-  ): number => {
-    let absoluteIndex = 0;
-    const categories = Object.keys(groupedSuggestions);
-    for (let i = 0; i < categoryIndex; i++) {
-      absoluteIndex += groupedSuggestions[categories[i]].length;
-    }
-
-    return absoluteIndex + itemIndex;
-  };
 
   if (isIndexBuilding) {
     return (
@@ -116,7 +95,10 @@ export function SuggestionList({
   }
 
   const isSelectedQuickLink = () => {
-    const selectedSuggestion = suggestions[selectedIndex];
+    if (!selectedCategory) return false;
+
+    const selectedSuggestion =
+      groupedSuggestions[selectedCategory]?.[selectedItemInCategory];
     return selectedSuggestion?.category === "Quick Links";
   };
 
@@ -152,20 +134,17 @@ export function SuggestionList({
                   <div className="text-xs text-gray-400 px-4 py-2 uppercase tracking-wide">
                     {category}
                   </div>
-                  {items.map((suggestion, itemIndex) => {
-                    const absoluteIndex = getAbsoluteIndex(
-                      categoryIndex,
-                      itemIndex
-                    );
-                    return (
-                      <SuggestionItem
-                        key={suggestion.id}
-                        suggestion={suggestion}
-                        selected={selectedIndex === absoluteIndex}
-                        onClick={() => onSuggestionClick(suggestion)}
-                      />
-                    );
-                  })}
+                  {items.map((suggestion, itemIndex) => (
+                    <SuggestionItem
+                      key={suggestion.id}
+                      suggestion={suggestion}
+                      selected={
+                        selectedCategory === category &&
+                        selectedItemInCategory === itemIndex
+                      }
+                      onClick={() => onSuggestionClick(suggestion)}
+                    />
+                  ))}
                 </div>
               )
             )}

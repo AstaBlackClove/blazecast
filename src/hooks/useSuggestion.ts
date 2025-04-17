@@ -96,7 +96,6 @@ export function useSuggestions(query: string): Suggestion[] {
             icon: app.icon,
             action: async () => {
               try {
-                console.log("From useSugggestion.tsx")
                 await invoke("open_app", { appId: app.id });
               } catch (error) {
                 console.error(`Failed to open ${app.name}:`, error);

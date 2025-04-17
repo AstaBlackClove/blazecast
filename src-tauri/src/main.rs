@@ -137,14 +137,11 @@ fn main() {
                 .global_shortcut_manager()
                 .register("Alt+Shift+C", move || {
                     let window = clipboard_app_handle.get_window("main").unwrap();
-                    if window.is_visible().unwrap() {
-                        window.hide().unwrap();
-                    } else {
-                        // Show window and notify frontend to switch to clipboard mode
-                        window.show().unwrap();
-                        window.set_focus().unwrap();
-                        window.emit("switch-to-clipboard", {}).unwrap();
-                    }
+
+                    // Show window and notify frontend to switch to clipboard mode
+                    window.show().unwrap();
+                    window.set_focus().unwrap();
+                    window.emit("switch-to-clipboard", {}).unwrap();
                 })
                 .unwrap();
 

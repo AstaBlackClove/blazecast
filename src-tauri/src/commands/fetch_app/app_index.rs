@@ -25,20 +25,27 @@ pub fn get_index_path() -> PathBuf {
 }
 
 pub fn add_manual_app(name: String, path: String) -> Result<AppInfo, String> {
+    println!("Adding manual app: {} at path: {}", name, path);
+
     // Validate basic path existence - this is a bit tricky with args
     let path_parts: Vec<&str> = path.split_whitespace().collect();
     let exe_path = if path.to_lowercase().ends_with(".lnk") {
+        println!("Parsing shortcut: {}", path);
         parse_shortcut(Path::new(&path))?
     } else {
         path_parts[0].trim_matches('"').to_string()
     };
 
+    println!("Using executable path: {}", exe_path);
+
     if !Path::new(&exe_path).exists() {
+        println!("Error: Path does not exist: {}", exe_path);
         return Err(format!("Executable path does not exist: {}", exe_path));
     }
 
     // Load the current app index
     let mut index = load_app_index();
+    println!("Loaded app index with {} existing apps", index.apps.len());
 
     // Check for duplicates by path or name
     let mut existing_id = None;
@@ -81,11 +88,16 @@ pub fn add_manual_app(name: String, path: String) -> Result<AppInfo, String> {
             access_count: index.apps.get(&id).map_or(0, |app| app.access_count),
         };
 
-        // Update the existing entry
+        // Add the new app to the index
+        println!("Adding new app with id: {}", id);
         index.apps.insert(id, app_info.clone());
 
         // Save the updated index
-        save_app_index(&index)?;
+        println!("Saving updated index with {} apps", index.apps.len());
+        match save_app_index(&index) {
+            Ok(_) => println!("Successfully saved app index"),
+            Err(e) => println!("Error saving app index: {}", e),
+        }
 
         return Ok(app_info);
     }
@@ -140,15 +152,42 @@ pub fn load_app_index() -> AppIndex {
 // Save the app index to disk
 pub fn save_app_index(index: &AppIndex) -> Result<(), String> {
     let path = get_index_path();
+    println!("Saving app index to: {:?}", path);
 
     // Ensure directory exists
     if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+        println!("Creating directory if needed: {:?}", parent);
+        match fs::create_dir_all(parent) {
+            Ok(_) => println!("Directory created or already exists"),
+            Err(e) => {
+                println!("Error creating directory: {}", e);
+                return Err(e.to_string());
+            }
+        }
     }
 
-    let json = serde_json::to_string_pretty(index).map_err(|e| e.to_string())?;
-    let mut file = File::create(&path).map_err(|e| e.to_string())?;
-    file.write_all(json.as_bytes()).map_err(|e| e.to_string())?;
+    let json = match serde_json::to_string_pretty(index) {
+        Ok(j) => j,
+        Err(e) => {
+            println!("Error serializing index to JSON: {}", e);
+            return Err(e.to_string());
+        }
+    };
+
+    println!("Writing {} bytes to index file", json.len());
+    match File::create(&path) {
+        Ok(mut file) => match file.write_all(json.as_bytes()) {
+            Ok(_) => println!("Successfully wrote index file"),
+            Err(e) => {
+                println!("Error writing to index file: {}", e);
+                return Err(e.to_string());
+            }
+        },
+        Err(e) => {
+            println!("Error creating index file: {}", e);
+            return Err(e.to_string());
+        }
+    }
 
     Ok(())
 }
@@ -177,15 +216,25 @@ pub fn build_app_index(force: bool) -> Result<AppIndex, String> {
 }
 
 pub fn refresh_app_index(app_index_state: &AppIndexState) {
+    println!("Starting refresh_app_index");
     let index_clone = app_index_state.index.clone();
 
     // Launch background thread to rebuild index
     thread::spawn(move || {
+        println!("Background thread: Building app index");
         if let Ok(new_index) = build_app_index(true) {
+            println!(
+                "Background thread: Got new index with {} apps",
+                new_index.apps.len()
+            );
             let mut index = index_clone.lock().unwrap();
             *index = new_index;
+            println!("Background thread: Updated app index");
+        } else {
+            println!("Background thread: Failed to build app index");
         }
     });
+    println!("refresh_app_index thread spawned");
 }
 
 // Initialize app index state

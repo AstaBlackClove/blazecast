@@ -321,7 +321,7 @@ export function QuickLinkCreator({
       <div className="flex justify-end p-4 border-t border-gray-700">
         <button
           onClick={onClose}
-          className="mr-2 px-4 py-2 bg-transparent text-white hover:bg-gray-700 rounded-md"
+          className="mr-2 px-4 py-2 text-white bg-gray-800 hover:bg-gray-700 rounded-md"
         >
           Cancel
         </button>

@@ -29,6 +29,8 @@ function App() {
     name: string;
     command: string;
   } | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedItemInCategory, setSelectedItemInCategory] = useState(0);
 
   const isClearing = useRef(false);
   const lastFetchTime = useRef(0);
@@ -37,7 +39,7 @@ function App() {
     apps: { width: 750, height: 500 },
     clipboard: { width: 900, height: 700 },
     create_quick_link: { width: 750, height: 600 },
-    add_manual_app: { width: 750, height: 450 },
+    add_manual_app: { width: 750, height: 400 },
   };
 
   const {
@@ -79,15 +81,29 @@ function App() {
       const recentSuggestions = apps.map((app) => ({
         ...appToSuggestion(app),
         action: async () => {
-          console.log("From App.tsx");
           // Ensure we're opening the correct app by ID
           await invoke("open_app", { appId: app.id });
           return false; // No modal opened
         },
       }));
 
-      // Update state with fresh data
-      setRecentApps(recentSuggestions);
+      // Group recent apps by category
+      const categorized = recentSuggestions.reduce<
+        Record<string, Suggestion[]>
+      >((acc, suggestion: any) => {
+        const category = suggestion.category || "Other";
+        if (!acc[category]) {
+          acc[category] = [];
+        }
+        acc[category].push(suggestion);
+        return acc;
+      }, {});
+
+      // Update state with fresh data - store both flat and categorized data
+      setRecentApps({
+        flat: recentSuggestions,
+        categorized: categorized,
+      });
     } catch (error) {
       console.error("Failed to fetch recent apps:", error);
     }
@@ -166,41 +182,64 @@ function App() {
   const rawSuggestions: Suggestion[] = useSuggestions(query);
 
   // Process suggestions to add proper action handling for quick links in search results
-  const suggestions = rawSuggestions.map((suggestion) => {
-    // If this is a quick link from search results, ensure it has the right action handler
-    if (suggestion.category === "Quick Links") {
-      return {
-        ...suggestion,
-        action: async () => {
-          // Extract the command from the subtitle if available
-          const command = suggestion.subtitle || "";
+  const processedSuggestions = useMemo(() => {
+    const processed = rawSuggestions.map((suggestion) => {
+      // If this is a quick link from search results, ensure it has the right action handler
+      if (suggestion.category === "Quick Links") {
+        return {
+          ...suggestion,
+          action: async () => {
+            // Extract the command from the subtitle if available
+            const command = suggestion.subtitle || "";
 
-          if (command.includes("{query}")) {
-            setQuickLinkQueryData({
-              id: suggestion.id,
-              name: suggestion.title,
-              command: command,
-            });
-            return true; // Return true to indicate we're showing a modal
-          } else {
-            // Execute directly using the ID
-            await invoke("execute_quick_link", { quickLinkId: suggestion.id });
-            return false; // No modal opened
-          }
-        },
-      };
-    }
-    return suggestion;
-  });
+            if (command.includes("{query}")) {
+              setQuickLinkQueryData({
+                id: suggestion.id,
+                name: suggestion.title,
+                command: command,
+              });
+              return true; // Return true to indicate we're showing a modal
+            } else {
+              // Execute directly using the ID
+              await invoke("execute_quick_link", {
+                quickLinkId: suggestion.id,
+              });
+              return false; // No modal opened
+            }
+          },
+        };
+      }
+      return suggestion;
+    });
+
+    // Group suggestions by category
+    const categorized = processed.reduce<Record<string, Suggestion[]>>(
+      (acc, suggestion: any) => {
+        const category = suggestion.category || "Other";
+        if (!acc[category]) {
+          acc[category] = [];
+        }
+        acc[category].push(suggestion);
+        return acc;
+      },
+      {}
+    );
+
+    return {
+      flat: processed,
+      categorized: categorized,
+    };
+  }, [rawSuggestions]);
 
   // Handle action for creating quick links
   useEffect(() => {
-    const quickLinkCreator = suggestions.find(
+    const flatSuggestions = processedSuggestions.flat;
+    const quickLinkCreator = flatSuggestions.find(
       (s) => s.id === "create_quick_link"
     );
     if (
       quickLinkCreator &&
-      selectedIndex === suggestions.indexOf(quickLinkCreator)
+      selectedIndex === flatSuggestions.indexOf(quickLinkCreator)
     ) {
       const handleCreateQuickLink = (e: KeyboardEvent) => {
         if (e.key === "Enter") {
@@ -215,14 +254,17 @@ function App() {
         window.removeEventListener("keydown", handleCreateQuickLink);
       };
     }
-  }, [suggestions, selectedIndex]);
+  }, [processedSuggestions, selectedIndex]);
 
   // Add this effect to handle manual app entry selection via keyboard
   useEffect(() => {
-    const manualAppEntry = suggestions.find((s) => s.id === "add_manual_app");
+    const flatSuggestions = processedSuggestions.flat;
+    const manualAppEntry = flatSuggestions.find(
+      (s) => s.id === "add_manual_app"
+    );
     if (
       manualAppEntry &&
-      selectedIndex === suggestions.indexOf(manualAppEntry)
+      selectedIndex === flatSuggestions.indexOf(manualAppEntry)
     ) {
       const handleManualAppEntry = (e: KeyboardEvent) => {
         if (e.key === "Enter") {
@@ -236,14 +278,36 @@ function App() {
         window.removeEventListener("keydown", handleManualAppEntry);
       };
     }
-  }, [suggestions, selectedIndex]);
+  }, [processedSuggestions, selectedIndex]);
 
-  const displayedSuggestions: any =
-    query.trim() === "" ? recentApps : suggestions;
+  const displayedSuggestions =
+    query.trim() === "" ? recentApps : processedSuggestions;
+
+  useEffect(() => {
+    if (
+      displayedSuggestions.categorized &&
+      Object.keys(displayedSuggestions.categorized).length > 0
+    ) {
+      const firstCategory = Object.keys(displayedSuggestions.categorized)[0];
+      setSelectedCategory(firstCategory);
+      setSelectedItemInCategory(0);
+    } else {
+      setSelectedCategory(null);
+      setSelectedItemInCategory(0);
+    }
+  }, [displayedSuggestions.categorized]);
 
   const handleQueryChange = (newQuery: string) => {
     setQuery(newQuery);
-    setSelectedIndex(0);
+    // Reset selection when query changes
+    if (
+      displayedSuggestions.categorized &&
+      Object.keys(displayedSuggestions.categorized).length > 0
+    ) {
+      const firstCategory = Object.keys(displayedSuggestions.categorized)[0];
+      setSelectedCategory(firstCategory);
+      setSelectedItemInCategory(0);
+    }
   };
 
   const handleSubmit = async () => {
@@ -261,7 +325,7 @@ function App() {
     }
 
     // Handle normal behavior
-    if (mode === "apps" && displayedSuggestions.length > 0) {
+    if (mode === "apps" && displayedSuggestions.flat.length > 0) {
       openSelectedApp();
     } else if (mode === "clipboard" && filteredClipboardHistory.length > 0) {
       handleCopyFromHistory(filteredClipboardHistory[selectedIndex].text);
@@ -277,10 +341,32 @@ function App() {
 
   const handleArrowUp = () => {
     if (mode === "apps") {
-      setSelectedIndex((prev) =>
-        prev > 0 ? prev - 1 : displayedSuggestions.length - 1
-      );
+      if (!selectedCategory) return;
+
+      const categories = Object.keys(displayedSuggestions.categorized);
+      const currentCategoryIndex = categories.indexOf(selectedCategory);
+      // const currentItems = displayedSuggestions.categorized[selectedCategory];
+
+      if (selectedItemInCategory > 0) {
+        // Move up within current category
+        setSelectedItemInCategory((prev) => prev - 1);
+      } else if (currentCategoryIndex > 0) {
+        // Move to previous category, select last item
+        const prevCategory = categories[currentCategoryIndex - 1];
+        const prevCategoryItems =
+          displayedSuggestions.categorized[prevCategory];
+        setSelectedCategory(prevCategory);
+        setSelectedItemInCategory(prevCategoryItems.length - 1);
+      } else {
+        // Wrap to last category, last item
+        const lastCategory = categories[categories.length - 1];
+        const lastCategoryItems =
+          displayedSuggestions.categorized[lastCategory];
+        setSelectedCategory(lastCategory);
+        setSelectedItemInCategory(lastCategoryItems.length - 1);
+      }
     } else if (mode === "clipboard") {
+      // Keep existing clipboard navigation logic
       setSelectedIndex((prev) => {
         const newIndex =
           prev > 0 ? prev - 1 : filteredClipboardHistory.length - 1;
@@ -292,10 +378,28 @@ function App() {
 
   const handleArrowDown = () => {
     if (mode === "apps") {
-      setSelectedIndex((prev) =>
-        prev < displayedSuggestions.length - 1 ? prev + 1 : 0
-      );
+      if (!selectedCategory) return;
+
+      const categories = Object.keys(displayedSuggestions.categorized);
+      const currentCategoryIndex = categories.indexOf(selectedCategory);
+      const currentItems = displayedSuggestions.categorized[selectedCategory];
+
+      if (selectedItemInCategory < currentItems.length - 1) {
+        // Move down within current category
+        setSelectedItemInCategory((prev) => prev + 1);
+      } else if (currentCategoryIndex < categories.length - 1) {
+        // Move to next category, select first item
+        const nextCategory = categories[currentCategoryIndex + 1];
+        setSelectedCategory(nextCategory);
+        setSelectedItemInCategory(0);
+      } else {
+        // Wrap to first category, first item
+        const firstCategory = categories[0];
+        setSelectedCategory(firstCategory);
+        setSelectedItemInCategory(0);
+      }
     } else if (mode === "clipboard") {
+      // Keep existing clipboard navigation logic
       setSelectedIndex((prev) => {
         const newIndex =
           prev < filteredClipboardHistory.length - 1 ? prev + 1 : 0;
@@ -363,7 +467,15 @@ function App() {
   };
 
   const openSelectedApp = async () => {
-    const selected = displayedSuggestions[selectedIndex];
+
+    if (!selectedCategory) return;
+
+    // Get the selected app from the categorized data
+    const selected =
+      displayedSuggestions.categorized[selectedCategory][
+        selectedItemInCategory
+      ];
+
     if (selected?.action) {
       try {
         // Execute the action and check if it opens a modal
@@ -389,7 +501,6 @@ function App() {
       if (isExecuting) return;
       isExecuting = true;
 
-      console.log(suggestion);
       if (suggestion?.action) {
         try {
           const opensModal = await suggestion.action();
@@ -492,6 +603,7 @@ function App() {
       mathPattern.test(query) && hasDigit && hasOperator && hasOnlyMathChars
     );
   };
+
   const handleCalculatorResult = (result: string | null) => {
     setCalculatorResult(result);
   };
@@ -518,8 +630,11 @@ function App() {
       <div className="flex-grow overflow-hidden">
         {mode === "apps" ? (
           <SuggestionList
-            suggestions={displayedSuggestions}
-            selectedIndex={selectedIndex}
+            suggestions={displayedSuggestions.flat}
+            groupedSuggestions={displayedSuggestions.categorized}
+            selectedIndex={selectedIndex} // Keep for backward compatibility
+            selectedCategory={selectedCategory}
+            selectedItemInCategory={selectedItemInCategory}
             onSuggestionClick={handleSuggestionClick}
             onDeleteQuickLink={refreshSuggestions}
             showFooter={!showCalculatorFooter}
