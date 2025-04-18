@@ -1,5 +1,6 @@
 # BlazeCast
 
+🚀 [Download the latest beta release](https://github.com/AstaBlackClove/blazecast/releases/tag/v0.1.0-beta)
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Windows](https://img.shields.io/badge/OS-Windows-blue)]()
 
