@@ -7,8 +7,7 @@
   <img src="src-tauri/icons/icon.ico" alt="BlazeCast Logo" width="200">
 </div>
 
-BlazeCast is a blazing fast productivity tool for Windows your shortcut to everything.  
-Inspired by Raycast, built for Windows users who want speed, simplicity, and power at their fingertips.
+**BlazeCast** – A blazing-fast productivity launcher for Windows, inspired by Raycast. Built with Rust ⚙️, React ⚛️, and Tauri 🚀 for speed and elegance.
 
 ⚡ Launch apps instantly  
 📋 Manage clipboard history like a pro  
@@ -31,9 +30,17 @@ Inspired by Raycast, built for Windows users who want speed, simplicity, and pow
 
 > _Note: Installation instructions will be added once we're ready for beta!_
 
-1. Download the latest installer from [Releases](#).
+1. Download the latest installer from [Releases](https://github.com/yourusername/blazecast/releases/latest).
 2. Run the installer and follow the prompts.
 3. Use the default hotkey (`Alt + Space`) to open BlazeCast.
+
+### 🚨 Prerequisites (For Developer Setup)
+
+If you're interested in contributing or running BlazeCast from source, you’ll need:
+
+- **Rust**: [Install Rust](https://www.rust-lang.org/tools/install)
+- **Node.js (v16 or higher)**: [Install Node.js](https://nodejs.org/)
+- **WiX Toolset** (For building the MSI): [Download WiX](https://wixtoolset.org/)
 
 ## 🛠️ Usage
 
@@ -45,6 +52,12 @@ Inspired by Raycast, built for Windows users who want speed, simplicity, and pow
 
 - **Quick Links**:  
   Open BlazeCast → Just type `create` -> And select `🔗 Create Quick Link`.
+
+## 📸 Demo
+
+Here's a quick preview of BlazeCast in action:
+
+![BlazeCast Demo](https://link_to_screenshot_or_gif.gif)
 
 ## 🧠 Why BlazeCast?
 
@@ -60,6 +73,20 @@ No bloat. No clutter. Just pure productivity.
 
 ## 🤝 Contributing
 
-Coming soon — stay tuned!
+We welcome contributions! To get started:
+
+1. Fork the repository
+2. Clone your fork locally
+3. Create a new branch
+4. Make your changes
+5. Open a pull request
+
+### Code of Conduct
+
+Please read our [Code of Conduct](./CODE_OF_CONDUCT.md) before contributing to BlazeCast.
+
+### License
+
+This project is licensed under the MIT License. See the [LICENSE](./LICENSE) file for more details.
 
 If you have ideas, feedback, or just want to say hi, feel free to [open an issue](#) or [email](mailto:gunasheelan208@gmail.com).
