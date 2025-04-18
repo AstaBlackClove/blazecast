@@ -41,7 +41,7 @@ Inspired by Raycast, built for Windows users who want speed, simplicity, and pow
   Press `Alt + Space`, type the app name, and hit `Enter`.
 
 - **Manage Clipboard**:  
-  Open BlazeCast → Go to Clipboard with `Alt + Shift + C` → Select any item to copy it again.
+  Open Clipboard with `Alt + Shift + C` → Select any item to copy it again.
 
 - **Quick Links**:  
   Open BlazeCast → Just type `create` -> And select `🔗 Create Quick Link`.

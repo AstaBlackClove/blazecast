@@ -19,8 +19,8 @@ export function useSuggestions(query: string): Suggestion[] {
 
       // Check for quick link creation keywords
       const quickLinkKeywords = [
-        'q',
-        'qui',
+        "q",
+        "qui",
         "cre",
         "create",
         "new",
@@ -32,19 +32,30 @@ export function useSuggestions(query: string): Suggestion[] {
       const refreshKeyword = ["re", "refresh", "reload"];
       const addManualAppSuggestion = ["add", "manualentry", "appentry"];
 
-      const shouldShowQuickLink = quickLinkKeywords.some((keyword) =>
-        trimmedQuery.toLowerCase().includes(keyword)
+      const isRefreshQuery = refreshKeyword.some(
+        (keyword) =>
+          trimmedQuery.toLowerCase() === keyword ||
+          trimmedQuery.toLowerCase().startsWith(`${keyword} `)
       );
 
-      const shouldShowRefresh = refreshKeyword.some((keyword) =>
-        trimmedQuery.toLowerCase().includes(keyword)
+      // Check for manual app entry in the same way
+      const isManualAppQuery = addManualAppSuggestion.some(
+        (keyword) =>
+          trimmedQuery.toLowerCase() === keyword ||
+          trimmedQuery.toLowerCase().startsWith(`${keyword} `)
       );
 
-      const shouldShowManualApp = addManualAppSuggestion.some((keyword) =>
-        trimmedQuery.toLowerCase().includes(keyword)
-      );
+      // Only show quick link if the others don't match and it matches the query
+      const isQuickLinkQuery =
+        !isRefreshQuery &&
+        !isManualAppQuery &&
+        quickLinkKeywords.some(
+          (keyword) =>
+            trimmedQuery.toLowerCase() === keyword ||
+            trimmedQuery.toLowerCase().startsWith(`${keyword} `)
+        );
 
-      if (shouldShowQuickLink) {
+      if (isQuickLinkQuery) {
         results.push({
           id: ActionType.CREATE_QUICK_LINK,
           title: "Create Quick Link",
@@ -54,11 +65,11 @@ export function useSuggestions(query: string): Suggestion[] {
         });
       }
 
-      if (shouldShowRefresh) {
+      if (isRefreshQuery) {
         results.push({
           id: ActionType.REFRESH_APP_INDEX,
           title: "Refresh App",
-          subtitle: "Refresh indexed applicaiton to detect new application",
+          subtitle: "Refresh indexed application to detect new applications",
           category: "Actions",
           icon: "🔄",
           action: async () => {
@@ -71,7 +82,7 @@ export function useSuggestions(query: string): Suggestion[] {
         });
       }
 
-      if (shouldShowManualApp) {
+      if (isManualAppQuery) {
         results.push({
           id: "add_manual_app",
           title: "Add Application Manually",
