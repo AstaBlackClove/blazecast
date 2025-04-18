@@ -1,8 +1,8 @@
 # BlazeCast
 
-🚀 [Download the latest beta release](https://github.com/AstaBlackClove/blazecast/releases/tag/v0.1.0-beta)
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Windows](https://img.shields.io/badge/OS-Windows-blue)]()
+[![Download](https://img.shields.io/badge/Blazecast-beta--v0.1.0--msi-blue)](https://github.com/AstaBlackClove/blazecast/releases/download/v0.1.0-beta/blazecast_v0.1.0-beta.msi)
 
 <div align="center">
   <img src="src-tauri/icons/icon.ico" alt="BlazeCast Logo" width="200">
