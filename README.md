@@ -40,7 +40,7 @@
 If you're interested in contributing or running BlazeCast from source, you’ll need:
 
 - **Rust**: [Install Rust](https://www.rust-lang.org/tools/install)
-- **Node.js (v16 or higher)**: [Install Node.js](https://nodejs.org/)
+- **Node.js (v18 or higher)**: [Install Node.js](https://nodejs.org/)
 - **WiX Toolset** (For building the MSI): [Download WiX](https://wixtoolset.org/)
 
 ## 🛠️ Usage
