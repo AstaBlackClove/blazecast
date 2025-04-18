@@ -33,7 +33,6 @@ export const ManualAppEntry = ({ onClose, onSave }: ManualAppEntryProps) => {
   const handleSave = async () => {
     // Reset any previous errors
     setError("");
-    console.log("Starting manual app entry with:", { appName, appPath });
 
     if (!appName.trim()) {
       setError("Application name is required");
@@ -53,23 +52,15 @@ export const ManualAppEntry = ({ onClose, onSave }: ManualAppEntryProps) => {
 
     try {
       setSaving(true);
-      console.log("Calling add_manual_application with:", {
-        name: appName.trim(),
-        path: appPath.trim(),
-      });
 
       // First add the manual application
-      const result = await invoke<AppInfo>("add_manual_application", {
+      await invoke<AppInfo>("add_manual_application", {
         name: appName.trim(),
         path: appPath.trim(),
       });
 
-      console.log("Result from add_manual_application:", result);
-
       // Then explicitly refresh the app index to ensure it's updated
-      console.log("Calling refresh_app_index...");
       await invoke("refresh_app_index");
-      console.log("refresh_app_index completed");
 
       setSaving(false);
       onSave(); // This will close the dialog and update the UI

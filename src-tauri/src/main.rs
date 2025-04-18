@@ -33,7 +33,6 @@ fn schedule_index_updates(app_index_state: Arc<Mutex<AppIndex>>) {
             let temp_state = AppIndexState {
                 index: app_index_state.clone(),
             };
-            println!("App refresh called");
             // Refresh the index
             commands::fetch_app::app_index::refresh_app_index(&temp_state);
         }
