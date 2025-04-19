@@ -31,7 +31,7 @@
 
 > _Note: Installation instructions will be added once we're ready for beta!_
 
-1. Download the latest installer from [Releases](https://github.com/yourusername/blazecast/releases/latest).
+1. Download the latest installer from [Beta](https://github.com/AstaBlackClove/blazecast/releases/download/v0.1.0-beta/blazecast_v0.1.0-beta.msi).
 2. Run the installer and follow the prompts.
 3. Use the default hotkey (`Alt + Space`) to open BlazeCast.
 
@@ -56,9 +56,11 @@ If you're interested in contributing or running BlazeCast from source, you’ll 
 
 ## 📸 Demo
 
-Here's a quick preview of BlazeCast in action:
+Coming Soon...
 
-![BlazeCast Demo](https://link_to_screenshot_or_gif.gif)
+<!-- Here's a quick preview of BlazeCast in action: -->
+
+<!-- ![BlazeCast Demo](https://link_to_screenshot_or_gif.gif) -->
 
 ## 🧠 Why BlazeCast?
 
@@ -68,7 +70,6 @@ No bloat. No clutter. Just pure productivity.
 ## 📅 Roadmap
 
 - Snippets & Text Expansions
-- Window Management Shortcuts
 - Plugin Ecosystem
 - Theming & Customization
 
@@ -84,10 +85,10 @@ We welcome contributions! To get started:
 
 ### Code of Conduct
 
-Please read our [Code of Conduct](./CODE_OF_CONDUCT.md) before contributing to BlazeCast.
+Please read our [Code of Conduct](.github/CODE_OF_CONDUCT.md) before contributing to BlazeCast.
 
 ### License
 
 This project is licensed under the MIT License. See the [LICENSE](./LICENSE) file for more details.
 
-If you have ideas, feedback, or just want to say hi, feel free to [open an issue](#) or [email](mailto:gunasheelan208@gmail.com).
+If you have ideas, feedback, or just want to say hi, feel free to [open an issue](https://github.com/AstaBlackClove/blazecast/issues) or [email](mailto:gunasheelan208@gmail.com).
