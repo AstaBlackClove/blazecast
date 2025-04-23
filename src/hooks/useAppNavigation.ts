@@ -7,7 +7,7 @@ const WINDOW_SIZES = {
   apps: { width: 750, height: 500 },
   clipboard: { width: 900, height: 700 },
   create_quick_link: { width: 750, height: 600 },
-  add_manual_app: { width: 750, height: 450 },
+  add_manual_app: { width: 750, height: 500 },
 };
 
 export function useAppNavigation() {
