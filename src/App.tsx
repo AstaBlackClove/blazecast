@@ -2,45 +2,30 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/tauri";
 import { CommandInput } from "./components/commandInput";
 import { SuggestionList } from "./components/suggestionList";
-import { AppInfo, appToSuggestion, Suggestion } from "./types";
-import { useSuggestions } from "./hooks/useSuggestion";
-import { useClipboardHistory } from "./hooks/useClipboard";
+import { AppInfo } from "./types";
 import { ClipboardHistory } from "./components/clipBoard/clipBoardHistory";
 import { QuickLinkCreator } from "./components/quickLink/quickLinkCreator";
-import { QuickLinkQueryExecutor } from "./components/quickLink/quickLinkQueryExe";
-import { listen } from "@tauri-apps/api/event";
 import { ManualAppEntry } from "./components/manualAppEntry/ManualAppEntry";
+import { listen } from "@tauri-apps/api/event";
+import { useAppNavigation } from "./hooks/useAppNavigation";
+import { useClipboardHistory } from "./hooks/useClipboard";
+import { useCalculator } from "./hooks/useCalculator";
+import { useQuickLinks } from "./hooks/useQuickLinks";
+import { useCategorizedSuggestions } from "./hooks/useCategorizedSuggestions";
+import { QuickLinkModal } from "./components/quickLink/QuickLinkModalProps";
+import { CalculatorFooter } from "./components/calculator/CalculatorFooterProps";
 
 function App() {
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [recentApps, setRecentApps] = useState<any>([]);
-  const [mode, setMode] = useState<
-    "apps" | "clipboard" | "create_quick_link" | "add_manual_app"
-  >("apps");
   const [resetTrigger, setResetTrigger] = useState(0);
-  const [calculatorResult, setCalculatorResult] = useState<string | null>(null);
-  const [showCalculatorCopied, setShowCalculatorCopied] = useState(false);
-
-  // Quick link states - keep popup version for backward compatibility
-  const [isQuickLinkCreatorOpen, setIsQuickLinkCreatorOpen] = useState(false);
-  const [quickLinkQueryData, setQuickLinkQueryData] = useState<{
-    id: string;
-    name: string;
-    command: string;
-  } | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedItemInCategory, setSelectedItemInCategory] = useState(0);
-
-  const isClearing = useRef(false);
   const lastFetchTime = useRef(0);
 
-  const WINDOW_SIZES = {
-    apps: { width: 750, height: 500 },
-    clipboard: { width: 900, height: 700 },
-    create_quick_link: { width: 750, height: 600 },
-    add_manual_app: { width: 750, height: 400 },
-  };
+  const { mode, setMode, resizeWindowForMode, handleBackToApps, handleEscape } =
+    useAppNavigation();
 
   const {
     clipboardHistory,
@@ -48,22 +33,29 @@ function App() {
     clearHistory,
     deleteHistoryItem,
     refreshClipboardHistory,
+    getFilteredHistory,
   } = useClipboardHistory();
 
   const filteredClipboardHistory =
     mode === "clipboard" && query
-      ? clipboardHistory.filter((item: any) =>
-          item.text.toLowerCase().includes(query.toLowerCase())
-        )
+      ? getFilteredHistory(query)
       : clipboardHistory;
 
-  const resizeWindowForMode = (
-    mode: "apps" | "clipboard" | "create_quick_link" | "add_manual_app"
-  ) => {
-    const size = WINDOW_SIZES[mode];
-    invoke("resize_window", { width: size.width, height: size.height });
-  };
+  const {
+    calculatorResult,
+    showCalculatorCopied,
+    setShowCalculatorCopied,
+    isMathCalculation,
+    handleCalculatorResult,
+  } = useCalculator();
 
+  const {
+    quickLinkQueryData,
+    setQuickLinkQueryData,
+    executeQuickLinkWithQuery,
+  } = useQuickLinks(setQuery);
+
+  // Fetch recent apps function
   const fetchRecentApps = async (force = false) => {
     try {
       // Throttle fetches to avoid hammering backend
@@ -76,44 +68,24 @@ function App() {
 
       // Always fetch fresh data from backend
       const apps: AppInfo[] = await invoke("get_recent_apps");
-
-      // Generate suggestions with updated action handlers
-      const recentSuggestions = apps.map((app) => ({
-        ...appToSuggestion(app),
-        action: async () => {
-          // Ensure we're opening the correct app by ID
-          await invoke("open_app", { appId: app.id });
-          return false; // No modal opened
-        },
-      }));
-
-      // Group recent apps by category
-      const categorized = recentSuggestions.reduce<
-        Record<string, Suggestion[]>
-      >((acc, suggestion: any) => {
-        const category = suggestion.category || "Other";
-        if (!acc[category]) {
-          acc[category] = [];
-        }
-        acc[category].push(suggestion);
-        return acc;
-      }, {});
-
-      // Update state with fresh data - store both flat and categorized data
-      setRecentApps({
-        flat: recentSuggestions,
-        categorized: categorized,
-      });
+      const processedApps = await useCategorizedSuggestions.processRecentApps(
+        apps
+      );
+      setRecentApps(processedApps);
     } catch (error) {
       console.error("Failed to fetch recent apps:", error);
     }
   };
 
+  // Process suggestions
+  const processedSuggestions = useCategorizedSuggestions.processSuggestions(
+    query,
+    setQuickLinkQueryData
+  );
+
   // Initial setup
   useEffect(() => {
-    //set width and height for the windows
     resizeWindowForMode("apps");
-    // Force a fresh load of recent apps
     fetchRecentApps(true);
 
     const handleShortcut = (event: KeyboardEvent) => {
@@ -171,119 +143,18 @@ function App() {
     return () => {
       window.removeEventListener("keydown", handleEnterKeyForCalculator);
     };
-  }, [calculatorResult, query, mode]);
+  }, [calculatorResult, query, mode, isMathCalculation, copyToClipboard]);
 
   // Refresh recent apps when app becomes visible or after reset
   useEffect(() => {
     fetchRecentApps(true);
   }, [resetTrigger]);
 
-  // Intercept search suggestions and enhance their action handlers
-  const rawSuggestions: Suggestion[] = useSuggestions(query);
-
-  // Process suggestions to add proper action handling for quick links in search results
-  const processedSuggestions = useMemo(() => {
-    const processed = rawSuggestions.map((suggestion) => {
-      // If this is a quick link from search results, ensure it has the right action handler
-      if (suggestion.category === "Quick Links") {
-        return {
-          ...suggestion,
-          action: async () => {
-            // Extract the command from the subtitle if available
-            const command = suggestion.subtitle || "";
-
-            if (command.includes("{query}")) {
-              setQuickLinkQueryData({
-                id: suggestion.id,
-                name: suggestion.title,
-                command: command,
-              });
-              return true; // Return true to indicate we're showing a modal
-            } else {
-              // Execute directly using the ID
-              await invoke("execute_quick_link", {
-                quickLinkId: suggestion.id,
-              });
-              return false; // No modal opened
-            }
-          },
-        };
-      }
-      return suggestion;
-    });
-
-    // Group suggestions by category
-    const categorized = processed.reduce<Record<string, Suggestion[]>>(
-      (acc, suggestion: any) => {
-        const category = suggestion.category || "Other";
-        if (!acc[category]) {
-          acc[category] = [];
-        }
-        acc[category].push(suggestion);
-        return acc;
-      },
-      {}
-    );
-
-    return {
-      flat: processed,
-      categorized: categorized,
-    };
-  }, [rawSuggestions]);
-
-  // Handle action for creating quick links
+  // Update selection when suggestions change
   useEffect(() => {
-    const flatSuggestions = processedSuggestions.flat;
-    const quickLinkCreator = flatSuggestions.find(
-      (s) => s.id === "create_quick_link"
-    );
-    if (
-      quickLinkCreator &&
-      selectedIndex === flatSuggestions.indexOf(quickLinkCreator)
-    ) {
-      const handleCreateQuickLink = (e: KeyboardEvent) => {
-        if (e.key === "Enter") {
-          // Use integrated quick link creator instead of popup
-          setMode("create_quick_link");
-          resizeWindowForMode("clipboard");
-        }
-      };
+    const displayedSuggestions =
+      query.trim() === "" ? recentApps : processedSuggestions;
 
-      window.addEventListener("keydown", handleCreateQuickLink);
-      return () => {
-        window.removeEventListener("keydown", handleCreateQuickLink);
-      };
-    }
-  }, [processedSuggestions, selectedIndex]);
-
-  // Add this effect to handle manual app entry selection via keyboard
-  useEffect(() => {
-    const flatSuggestions = processedSuggestions.flat;
-    const manualAppEntry = flatSuggestions.find(
-      (s) => s.id === "add_manual_app"
-    );
-    if (
-      manualAppEntry &&
-      selectedIndex === flatSuggestions.indexOf(manualAppEntry)
-    ) {
-      const handleManualAppEntry = (e: KeyboardEvent) => {
-        if (e.key === "Enter") {
-          // Switch to manual app entry mode
-          setMode("add_manual_app");
-          resizeWindowForMode("add_manual_app");
-        }
-      };
-      window.addEventListener("keydown", handleManualAppEntry);
-      return () => {
-        window.removeEventListener("keydown", handleManualAppEntry);
-      };
-    }
-  }, [processedSuggestions, selectedIndex]);
-
-  const displayedSuggestions =
-    query.trim() === "" ? recentApps : processedSuggestions;
-
-  useEffect(() => {
     if (
       displayedSuggestions.categorized &&
       Object.keys(displayedSuggestions.categorized).length > 0
@@ -295,11 +166,13 @@ function App() {
       setSelectedCategory(null);
       setSelectedItemInCategory(0);
     }
-  }, [displayedSuggestions.categorized]);
+  }, [processedSuggestions, recentApps, query]);
 
   const handleQueryChange = (newQuery: string) => {
     setQuery(newQuery);
     // Reset selection when query changes
+    const displayedSuggestions =
+      newQuery.trim() === "" ? recentApps : processedSuggestions;
     if (
       displayedSuggestions.categorized &&
       Object.keys(displayedSuggestions.categorized).length > 0
@@ -310,42 +183,14 @@ function App() {
     }
   };
 
-  const handleSubmit = async () => {
-    // Check if calculator is showing and we have a result to copy
-    if (mode === "apps" && isMathCalculation(query) && calculatorResult) {
-      await copyToClipboard(calculatorResult);
-      setShowCalculatorCopied(true);
-
-      // Hide the copied message after 2 seconds
-      setTimeout(() => {
-        setShowCalculatorCopied(false);
-      }, 2000);
-
-      return;
-    }
-
-    // Handle normal behavior
-    if (mode === "apps" && displayedSuggestions.flat.length > 0) {
-      openSelectedApp();
-    } else if (mode === "clipboard" && filteredClipboardHistory.length > 0) {
-      handleCopyFromHistory(filteredClipboardHistory[selectedIndex].text);
-    }
-  };
-
-  const scrollToClipboardItem = (index: number) => {
-    const item = document.getElementById(`clipboard-item-${index}`);
-    if (item) {
-      item.scrollIntoView({ behavior: "smooth", block: "nearest" });
-    }
-  };
-
   const handleArrowUp = () => {
     if (mode === "apps") {
       if (!selectedCategory) return;
 
+      const displayedSuggestions =
+        query.trim() === "" ? recentApps : processedSuggestions;
       const categories = Object.keys(displayedSuggestions.categorized);
       const currentCategoryIndex = categories.indexOf(selectedCategory);
-      // const currentItems = displayedSuggestions.categorized[selectedCategory];
 
       if (selectedItemInCategory > 0) {
         // Move up within current category
@@ -380,6 +225,8 @@ function App() {
     if (mode === "apps") {
       if (!selectedCategory) return;
 
+      const displayedSuggestions =
+        query.trim() === "" ? recentApps : processedSuggestions;
       const categories = Object.keys(displayedSuggestions.categorized);
       const currentCategoryIndex = categories.indexOf(selectedCategory);
       const currentItems = displayedSuggestions.categorized[selectedCategory];
@@ -409,89 +256,69 @@ function App() {
     }
   };
 
-  const handleEscape = () => {
-    if (isQuickLinkCreatorOpen) {
-      setIsQuickLinkCreatorOpen(false);
-      return;
+  const scrollToClipboardItem = (index: number) => {
+    const item = document.getElementById(`clipboard-item-${index}`);
+    if (item) {
+      item.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
+  };
 
-    if (quickLinkQueryData) {
-      setQuickLinkQueryData(null);
-      // Focus the command input when closing the query modal
+  const handleSubmit = async () => {
+    // Check if calculator is showing and we have a result to copy
+    if (mode === "apps" && isMathCalculation(query) && calculatorResult) {
+      await copyToClipboard(calculatorResult);
+      setShowCalculatorCopied(true);
+
+      // Hide the copied message after 2 seconds
       setTimeout(() => {
-        const commandInput = document.getElementById("command-input");
-        if (commandInput) {
-          (commandInput as HTMLInputElement).focus();
+        setShowCalculatorCopied(false);
+      }, 2000);
+
+      return;
+    }
+
+    // Handle normal behavior
+    if (mode === "apps" && selectedCategory) {
+      // For apps mode, use the categorized structure
+      const selectedItem =
+        displayedSuggestions.categorized[selectedCategory][
+          selectedItemInCategory
+        ];
+
+      if (selectedItem) {
+        // Special cases
+        if (selectedItem.id === "create_quick_link") {
+          setMode("create_quick_link");
+          resizeWindowForMode("create_quick_link");
+          return;
         }
-      }, 0);
-      return;
-    }
 
-    if (mode === "create_quick_link" || mode === "add_manual_app") {
-      setMode("apps");
-      resizeWindowForMode("apps");
-      return;
-    }
-
-    if (mode === "clipboard" && query) {
-      setQuery("");
-      setResetTrigger((prev) => prev + 1);
-      return;
-    }
-
-    if (mode === "clipboard") {
-      setMode("apps");
-      resizeWindowForMode("apps");
-      return;
-    }
-
-    invoke("hide_window");
-  };
-
-  // Add a function to handle saving a manual app
-  const handleManualAppSave = async () => {
-    setMode("apps");
-    setQuery("");
-    setResetTrigger((prev) => prev + 1);
-    resizeWindowForMode("apps");
-    // Force refresh recent apps to include the newly added app
-    await fetchRecentApps(true);
-  };
-
-  const handleBackToApps = () => {
-    setMode("apps");
-    setQuery("");
-    setSelectedIndex(0);
-    setResetTrigger((prev) => prev + 1);
-    resizeWindowForMode("apps");
-  };
-
-  const openSelectedApp = async () => {
-
-    if (!selectedCategory) return;
-
-    // Get the selected app from the categorized data
-    const selected =
-      displayedSuggestions.categorized[selectedCategory][
-        selectedItemInCategory
-      ];
-
-    if (selected?.action) {
-      try {
-        // Execute the action and check if it opens a modal
-        const opensModal = await selected.action();
-
-        // Only hide window if not opening a modal
-        if (!opensModal) {
-          await invoke("hide_window");
-          setQuery("");
-          setResetTrigger((prev) => prev + 1);
-          // Force refresh recent apps for next time
-          await fetchRecentApps(true);
+        if (selectedItem.id === "add_manual_app") {
+          setMode("add_manual_app");
+          resizeWindowForMode("add_manual_app");
+          return;
         }
-      } catch (error) {
-        console.error(error);
+
+        // Regular action
+        if (selectedItem.action) {
+          const opensModal = await selectedItem.action();
+          if (!opensModal) {
+            await invoke("hide_window");
+            setQuery("");
+            setResetTrigger((prev) => prev + 1);
+            await fetchRecentApps(true);
+          }
+        }
       }
+    } else if (mode === "clipboard" && filteredClipboardHistory.length > 0) {
+      handleCopyFromHistory(filteredClipboardHistory[selectedIndex].text);
+    }
+  };
+
+  const handleCopyFromHistory = async (text: string) => {
+    const success = await copyToClipboard(text);
+    if (success) {
+      invoke("hide_window");
     }
   };
 
@@ -501,8 +328,25 @@ function App() {
       if (isExecuting) return;
       isExecuting = true;
 
-      if (suggestion?.action) {
-        try {
+      try {
+        // Special handling for create quick link
+        if (suggestion.id === "create_quick_link") {
+          setMode("create_quick_link");
+          resizeWindowForMode("create_quick_link");
+          isExecuting = false;
+          return;
+        }
+
+        // Special handling for add manual app
+        if (suggestion.id === "add_manual_app") {
+          setMode("add_manual_app");
+          resizeWindowForMode("add_manual_app");
+          isExecuting = false;
+          return;
+        }
+
+        // Normal action handling for other suggestions
+        if (suggestion?.action) {
           const opensModal = await suggestion.action();
           if (!opensModal) {
             await invoke("hide_window");
@@ -510,28 +354,17 @@ function App() {
             setResetTrigger((prev) => prev + 1);
             await fetchRecentApps(true);
           }
-        } catch (error) {
-          console.error(error);
-        } finally {
-          isExecuting = false;
         }
+      } catch (error) {
+        console.error(error);
+      } finally {
+        isExecuting = false;
       }
     };
-  }, []);
-
-  const handleCopyFromHistory = async (text: string) => {
-    const success = await copyToClipboard(text);
-    if (success) {
-      invoke("hide_window");
-    }
-  };
+  }, [setMode, resizeWindowForMode]);
 
   const handleClearHistory = () => {
-    isClearing.current = true;
     clearHistory();
-    setTimeout(() => {
-      isClearing.current = false;
-    }, 2000);
   };
 
   const handlePinSuccess = async () => {
@@ -545,70 +378,27 @@ function App() {
     resizeWindowForMode("apps");
   };
 
-  const executeQuickLinkWithQuery = async (finalCommand: string) => {
-    if (!quickLinkQueryData) return;
-
-    await invoke("execute_quick_link_with_command", {
-      quickLinkId: quickLinkQueryData.id,
-      command: finalCommand,
-    });
-
-    setQuickLinkQueryData(null);
+  const handleManualAppSave = async () => {
+    setMode("apps");
     setQuery("");
     setResetTrigger((prev) => prev + 1);
-    await invoke("hide_window");
+    resizeWindowForMode("apps");
+    // Force refresh recent apps to include the newly added app
+    await fetchRecentApps(true);
   };
-
-  useEffect(() => {
-    if (mode === "clipboard") {
-      resizeWindowForMode("clipboard");
-      setSelectedIndex(filteredClipboardHistory.length > 0 ? 0 : -1);
-    } else if (mode === "create_quick_link") {
-      resizeWindowForMode("create_quick_link");
-    }
-  }, [mode, filteredClipboardHistory.length]);
 
   const refreshSuggestions = async () => {
     setSelectedIndex(0);
-
-    // Always force refresh recent apps for any refresh operation
     await fetchRecentApps(true);
-
     if (query.trim() !== "") {
       // Then refresh search view if needed
       setQuery((prev) => prev + " ");
     }
   };
 
-  const isMathCalculation = (query: string): boolean => {
-    // Check if it matches a unit conversion pattern
-    const unitConversionPattern =
-      /^\d+(?:\.\d+)?\s*[a-zA-Z°]+\s*to\s*[a-zA-Z°]+$/i;
-    if (unitConversionPattern.test(query.trim())) {
-      return true;
-    }
-
-    // If not a unit conversion, check if it's a math calculation
-    // Check if the query contains numeric values and mathematical operators
-    const mathPattern = /[\d+\-*/.()\s]+/;
-
-    // Check if query has at least one digit and one operator
-    const hasDigit = /\d/.test(query);
-    const hasOperator = /[+\-*/]/.test(query);
-
-    // Make sure the query doesn't have other characters
-    const hasOnlyMathChars = /^[\d+\-*/.()\s]+$/.test(query);
-
-    return (
-      mathPattern.test(query) && hasDigit && hasOperator && hasOnlyMathChars
-    );
-  };
-
-  const handleCalculatorResult = (result: string | null) => {
-    setCalculatorResult(result);
-  };
-
-  // Determine if we should show calculator footer
+  // UI rendering logic
+  const displayedSuggestions =
+    query.trim() === "" ? recentApps : processedSuggestions;
   const showCalculatorFooter =
     mode === "apps" && isMathCalculation(query) && calculatorResult;
 
@@ -667,10 +457,8 @@ function App() {
 
       {/* Quick Link Query Executor Modal */}
       {quickLinkQueryData && (
-        <QuickLinkQueryExecutor
-          quickLinkId={quickLinkQueryData.id}
-          quickLinkName={quickLinkQueryData.name}
-          commandTemplate={quickLinkQueryData.command}
+        <QuickLinkModal
+          quickLinkData={quickLinkQueryData}
           onClose={() => setQuickLinkQueryData(null)}
           onExecute={executeQuickLinkWithQuery}
         />
@@ -678,21 +466,7 @@ function App() {
 
       {/* Calculator Footer */}
       {showCalculatorFooter && (
-        <div className="flex-shrink-0 bg-gray-700 border-t border-gray-800 px-4 py-2 text-xs text-gray-400">
-          <div className="flex justify-between items-center">
-            <div>Calculator</div>
-            <div className="flex space-x-3">
-              <div className="flex items-center space-x-2">
-                <span className="bg-gray-800 px-2 py-1 rounded">↵</span>
-                <span>{showCalculatorCopied ? "Copied!" : "Copy Result"}</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <span className="bg-gray-800 px-2 py-1 rounded">ESC</span>
-                <span>Close</span>
-              </div>
-            </div>
-          </div>
-        </div>
+        <CalculatorFooter showCopied={showCalculatorCopied} />
       )}
     </div>
   );

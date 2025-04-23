@@ -49,6 +49,14 @@ export const useClipboardHistory = () => {
     }
   };
 
+  const getFilteredHistory = (query: string) => {
+    return query
+      ? clipboardHistory.filter((item: any) =>
+          item.text.toLowerCase().includes(query.toLowerCase())
+        )
+      : clipboardHistory;
+  };
+
   // Check clipboard content
   const checkClipboard = async () => {
     // if (isInClearing.current) return;
@@ -246,6 +254,7 @@ export const useClipboardHistory = () => {
 
   return {
     clipboardHistory,
+    getFilteredHistory,
     copyToClipboard,
     clearHistory,
     deleteHistoryItem,
