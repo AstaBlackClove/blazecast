@@ -87,10 +87,45 @@ pub async fn get_quick_links(
         .quick_links
         .lock()
         .map_err(|_| "Failed to lock quick_links state".to_string())?;
-
     let mut quick_links: Vec<QuickLink> = quick_links_guard.values().cloned().collect();
     quick_links.sort_by(|a, b| b.last_used.unwrap_or(0).cmp(&a.last_used.unwrap_or(0)));
     Ok(quick_links)
+}
+
+// New function with required State parameter
+#[tauri::command]
+pub async fn search_quick_links(
+    query: &str,
+    quick_link_state: State<'_, QuickLinkState>,
+) -> Result<Vec<QuickLink>, String> {
+    // Get all quick links using the state parameter
+    let quick_links_guard = quick_link_state
+        .quick_links
+        .lock()
+        .map_err(|_| "Failed to lock quick_links state".to_string())?;
+
+    // Convert to Vec and clone for processing
+    let all_quick_links: Vec<QuickLink> = quick_links_guard.values().cloned().collect();
+
+    // Case-insensitive filtering
+    let query = query.to_lowercase();
+    let filtered_links: Vec<QuickLink> = all_quick_links
+        .into_iter()
+        .filter(|link| {
+            link.name.to_lowercase().contains(&query)
+                || link
+                    .description
+                    .as_ref()
+                    .map_or(false, |desc| desc.to_lowercase().contains(&query))
+                || link.command.to_lowercase().contains(&query)
+        })
+        .collect();
+
+    // Sort filtered results by last_used date
+    let mut sorted_filtered_links = filtered_links;
+    sorted_filtered_links.sort_by(|a, b| b.last_used.unwrap_or(0).cmp(&a.last_used.unwrap_or(0)));
+
+    Ok(sorted_filtered_links)
 }
 
 // Command to get recent quick links

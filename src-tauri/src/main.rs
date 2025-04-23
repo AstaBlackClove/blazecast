@@ -19,7 +19,7 @@ use commands::fetch_app::{
 use commands::quick_link::{
     check_vscode_path, delete_quick_link, execute_quick_link, execute_quick_link_with_command,
     get_default_browser, get_open_with_suggestions, get_quick_links, get_recent_quick_links,
-    save_quick_link,
+    save_quick_link, search_quick_links,
 };
 use commands::window_resize::resize_window;
 
@@ -91,6 +91,7 @@ fn main() {
             delete_from_clipboard,
             pin_clipboard_item,
             get_quick_links,
+            search_quick_links,
             get_recent_quick_links,
             save_quick_link,
             execute_quick_link,

@@ -120,7 +120,10 @@ export function useSuggestions(query: string): Suggestion[] {
 
       // Fetch saved quick links
       try {
-        const quickLinks: any[] = await invoke("get_quick_links");
+        const quickLinks: any[] = await invoke("search_quick_links", {
+          query: trimmedQuery,
+        });
+
         quickLinks.forEach((link) => {
           results.push({
             id: link.id,
