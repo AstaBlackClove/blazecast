@@ -39,13 +39,6 @@ fn schedule_index_updates(app_index_state: Arc<Mutex<AppIndex>>) {
     });
 }
 
-pub fn show_window_clipboard_mode(window: tauri::Window) {
-    window.show().unwrap();
-    window.set_focus().unwrap();
-    // We'll send an event to the frontend to switch to clipboard mode
-    window.emit("switch-to-clipboard", {}).unwrap();
-}
-
 fn main() {
     let tray_menu = tauri::SystemTrayMenu::new()
         .add_item(tauri::CustomMenuItem::new("show", "Show"))

@@ -17,83 +17,64 @@ export function useSuggestions(query: string): Suggestion[] {
         return;
       }
 
-      // Check for quick link creation keywords
-      const quickLinkKeywords = [
-        "q",
-        "qui",
-        "cre",
-        "create",
-        "new",
-        "link",
-        "quicklink",
-        "quick link",
+      const queryLower = trimmedQuery.toLowerCase();
+
+      // Define action patterns with their corresponding suggestion creator functions
+      const actionPatterns = [
+        {
+          // Matches: quick link, link, create, new, etc.
+          match: (q: string) =>
+            /^(q|qui|cre|create|new|link|quicklink|quick link)/i.test(q),
+          createSuggestion: () => ({
+            id: ActionType.CREATE_QUICK_LINK,
+            title: "Create Quick Link",
+            subtitle: "Create a new quick link to a website or application",
+            category: "Actions",
+            icon: "🔗",
+          }),
+        },
+        {
+          // Matches: refresh, reload, re, ref, etc.
+          match: (q: string) => /^(re|ref|refr|refresh|reload)/i.test(q),
+          createSuggestion: () => ({
+            id: ActionType.REFRESH_APP_INDEX,
+            title: "Refresh App",
+            subtitle: "Refresh indexed application to detect new applications",
+            category: "Actions",
+            icon: "🔄",
+            action: async () => {
+              try {
+                await invoke("refresh_app_index");
+              } catch (error) {
+                console.error("Failed to refresh app index:", error);
+              }
+            },
+          }),
+        },
+        {
+          // Matches: add, manual entry, app entry, etc.
+          match: (q: string) => /^(add|manual|manualentry|appentry)/i.test(q),
+          createSuggestion: () => ({
+            id: "add_manual_app",
+            title: "Add Application Manually",
+            subtitle:
+              "Add custom applications that weren't detected automatically",
+            icon: "➕",
+            category: "System",
+          }),
+        },
       ];
 
-      const refreshKeyword = ["re", "refresh", "reload"];
-      const addManualAppSuggestion = ["add", "manualentry", "appentry"];
-
-      const isRefreshQuery = refreshKeyword.some(
-        (keyword) =>
-          trimmedQuery.toLowerCase() === keyword ||
-          trimmedQuery.toLowerCase().startsWith(`${keyword} `)
-      );
-
-      // Check for manual app entry in the same way
-      const isManualAppQuery = addManualAppSuggestion.some(
-        (keyword) =>
-          trimmedQuery.toLowerCase() === keyword ||
-          trimmedQuery.toLowerCase().startsWith(`${keyword} `)
-      );
-
-      // Only show quick link if the others don't match and it matches the query
-      const isQuickLinkQuery =
-        !isRefreshQuery &&
-        !isManualAppQuery &&
-        quickLinkKeywords.some(
-          (keyword) =>
-            trimmedQuery.toLowerCase() === keyword ||
-            trimmedQuery.toLowerCase().startsWith(`${keyword} `)
-        );
-
-      if (isQuickLinkQuery) {
-        results.push({
-          id: ActionType.CREATE_QUICK_LINK,
-          title: "Create Quick Link",
-          subtitle: "Create a new quick link to a website or application",
-          category: "Actions",
-          icon: "🔗",
-        });
+      // Check for action patterns and add corresponding suggestions
+      // Use priority order (only add first matching action)
+      for (const pattern of actionPatterns) {
+        if (pattern.match(queryLower)) {
+          results.push(pattern.createSuggestion());
+          break; // Only add the first matching action
+        }
       }
 
-      if (isRefreshQuery) {
-        results.push({
-          id: ActionType.REFRESH_APP_INDEX,
-          title: "Refresh App",
-          subtitle: "Refresh indexed application to detect new applications",
-          category: "Actions",
-          icon: "🔄",
-          action: async () => {
-            try {
-              await invoke("refresh_app_index");
-            } catch (error) {
-              console.error("Failed to refresh app index:", error);
-            }
-          },
-        });
-      }
-
-      if (isManualAppQuery) {
-        results.push({
-          id: "add_manual_app",
-          title: "Add Application Manually",
-          subtitle:
-            "Add custom applications that weren't detected automatically",
-          icon: "➕",
-          category: "System",
-        });
-      }
-
-      // Fetch app results first
+      // Fetch app results
       try {
         const appResults: AppInfo[] = await invoke("search_apps", {
           query: trimmedQuery,
