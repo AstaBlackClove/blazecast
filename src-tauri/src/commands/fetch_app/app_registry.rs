@@ -22,7 +22,8 @@ use crate::commands::fetch_app::{
 /// Checks if an application with the same target path already exists in the app collection
 fn is_duplicate_app(apps: &HashMap<String, AppInfo>, target_path: &str) -> bool {
     let target_path_lower = target_path.to_lowercase();
-    apps.values().any(|app| app.path.to_lowercase() == target_path_lower)
+    apps.values()
+        .any(|app| app.path.to_lowercase() == target_path_lower)
 }
 
 fn scan_additional_shortcuts(
@@ -35,13 +36,13 @@ fn scan_additional_shortcuts(
             .filter_map(Result::ok)
         {
             let path = entry.path();
-            
+
             // If this is a directory, recursively scan it
             if path.is_dir() {
                 scan_additional_shortcuts(apps, &path)?;
                 continue;
             }
-            
+
             let is_lnk = path
                 .extension()
                 .and_then(|ext| ext.to_str())
@@ -60,8 +61,7 @@ fn scan_additional_shortcuts(
             };
 
             if let Some(target_path) = target_path {
-                if target_path.to_lowercase().ends_with(".exe")
-                    && Path::new(&target_path).exists()
+                if target_path.to_lowercase().ends_with(".exe") && Path::new(&target_path).exists()
                 {
                     let name = path
                         .file_stem()
@@ -71,7 +71,7 @@ fn scan_additional_shortcuts(
                     if should_skip_app(&name, &target_path) {
                         continue;
                     }
-                    
+
                     // Check if this application is already indexed (by path)
                     if !is_duplicate_app(apps, &target_path) {
                         let id = Uuid::new_v4().to_string();
@@ -125,6 +125,11 @@ pub fn read_installed_apps() -> Result<HashMap<String, AppInfo>, String> {
 fn should_skip_app(name: &str, path: &str) -> bool {
     let name_lower = name.to_lowercase();
     let path_lower = path.to_lowercase();
+
+    // Skip Blazecast
+    if name_lower.contains("blazecast") {
+        return true;
+    }
 
     // Explicitly allow Steam even if some of the other keywords match.
     if name_lower.contains("steam") {
