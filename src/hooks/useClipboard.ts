@@ -57,11 +57,14 @@ export const useClipboardHistory = () => {
   };
 
   const getFilteredHistory = (query: string) => {
-    return query
-      ? clipboardHistory.filter((item: any) =>
-          item.text.toLowerCase().includes(query.toLowerCase())
-        )
-      : clipboardHistory;
+    if (!query) return clipboardHistory;
+
+    const loweredQuery = query.toLowerCase();
+
+    return clipboardHistory.filter(
+      (item: ClipboardItem) =>
+        item.type === "text" && item.text?.toLowerCase().includes(loweredQuery)
+    );
   };
 
   // Check clipboard content
@@ -224,6 +227,7 @@ export const useClipboardHistory = () => {
   };
 
   const copyToClipboard = async (text: string) => {
+    if (!text) return false;
     try {
       await invoke("set_clipboard", { text });
 
@@ -302,6 +306,15 @@ export const useClipboardHistory = () => {
         // Force a clipboard check after clearing completes
         checkClipboard();
       }, 2000);
+    }
+  };
+
+  const copyImageAndHide = async (filePath: string) => {
+    try {
+      await invoke("set_clipboard_image", { filePath });
+      await invoke("hide_window");
+    } catch (error) {
+      console.error("Failed to copy image:", error);
     }
   };
 
@@ -384,6 +397,7 @@ export const useClipboardHistory = () => {
   return {
     clipboardHistory,
     getFilteredHistory,
+    copyImageAndHide,
     copyToClipboard,
     clearHistory,
     deleteHistoryItem,

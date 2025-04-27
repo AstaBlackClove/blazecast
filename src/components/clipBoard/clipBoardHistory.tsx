@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { ClipboardItem } from "../../hooks/useClipboard";
+import { ClipboardItem, useClipboardHistory } from "../../hooks/useClipboard";
 import { invoke } from "@tauri-apps/api/tauri";
 import { ClipboardImage } from "./clipBoardimg";
 
@@ -30,6 +30,8 @@ export const ClipboardHistory: React.FC<ClipboardHistoryProps> = ({
   const appRef = useRef<HTMLDivElement>(null);
   const maxPins = 3;
   const canAddPin = pinnedItems.length < maxPins;
+
+  const { copyImageAndHide } = useClipboardHistory();
 
   const pinItem = async (id: number) => {
     try {
@@ -162,11 +164,7 @@ export const ClipboardHistory: React.FC<ClipboardHistoryProps> = ({
               pinnedItem.type === "image" &&
               pinnedItem.imageData?.filePath
             ) {
-              invoke("set_clipboard_image", {
-                filePath: pinnedItem.imageData.filePath,
-              }).catch((error) => {
-                console.error("Failed to copy image to clipboard:", error);
-              });
+              copyImageAndHide(pinnedItem.imageData.filePath);
             }
           }
         }
@@ -217,11 +215,7 @@ export const ClipboardHistory: React.FC<ClipboardHistoryProps> = ({
           selectedItem.type === "image" &&
           selectedItem.imageData?.filePath
         ) {
-          invoke("set_clipboard_image", {
-            filePath: selectedItem.imageData.filePath,
-          }).catch((error) => {
-            console.error("Failed to copy image to clipboard:", error);
-          });
+          copyImageAndHide(selectedItem.imageData.filePath);
         }
         break;
       case 1: // Delete
@@ -252,15 +246,16 @@ export const ClipboardHistory: React.FC<ClipboardHistoryProps> = ({
         const selectedItem = history[selectedIndex];
         if (selectedItem.type === "text" && selectedItem.text) {
           onCopy(selectedItem.text);
+          // Close window after copying text
+          invoke("close_main_window").catch((error) => {
+            console.error("Failed to close window:", error);
+          });
         } else if (
           selectedItem.type === "image" &&
           selectedItem.imageData?.filePath
         ) {
-          invoke("set_clipboard_image", {
-            filePath: selectedItem.imageData.filePath,
-          }).catch((error) => {
-            console.error("Failed to copy image to clipboard:", error);
-          });
+          console.log("triggered");
+          copyImageAndHide(selectedItem.imageData.filePath);
         }
       }
     } else if (e.key === "Delete") {

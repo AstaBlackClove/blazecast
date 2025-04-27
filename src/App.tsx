@@ -31,6 +31,7 @@ function App() {
     clipboardHistory,
     copyToClipboard,
     clearHistory,
+    copyImageAndHide,
     deleteHistoryItem,
     refreshClipboardHistory,
     getFilteredHistory,
@@ -311,7 +312,13 @@ function App() {
         }
       }
     } else if (mode === "clipboard" && filteredClipboardHistory.length > 0) {
-      handleCopyFromHistory(filteredClipboardHistory[selectedIndex].text);
+      const selectedItem = filteredClipboardHistory[selectedIndex];
+      if (selectedItem.type === "text") {
+        handleCopyFromHistory(selectedItem.text);
+      } else if (selectedItem.type === "image") {
+        // Directly handle image copy for Enter press
+        await copyImageAndHide(selectedItem.imageData.filePath);
+      }
     }
   };
 
