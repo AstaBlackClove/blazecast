@@ -9,8 +9,9 @@ use std::sync::{Arc, Mutex};
 mod commands;
 use auto::auto_start::{disable_autostart, enable_autostart};
 use commands::clip_board::{
-    clear_system_clipboard, delete_from_clipboard, get_clipboard, load_clipboard_history,
-    pin_clipboard_item, save_clipboard_history, set_clipboard,
+    clear_system_clipboard, delete_from_clipboard, get_clipboard, get_clipboard_image,
+    load_clipboard_history, pin_clipboard_item, save_clipboard_history, set_clipboard,
+    set_clipboard_image,load_clipboard_image_bytes,delete_clipboard_image_file
 };
 use commands::fetch_app::{
     add_manual_application, get_index_status, get_recent_apps, hide_window, init_app_index,
@@ -94,7 +95,11 @@ fn main() {
             check_vscode_path,
             get_default_browser,
             refresh_app_index,
-            add_manual_application
+            add_manual_application,
+            get_clipboard_image,
+            set_clipboard_image,
+            load_clipboard_image_bytes,
+            delete_clipboard_image_file
         ])
         .setup(|app| {
             // Initialize quick links

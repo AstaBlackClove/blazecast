@@ -17,11 +17,24 @@ pub struct ClipboardHistoryFile {
 #[derive(Serialize, Deserialize, Clone)]
 pub struct ClipboardItem {
     pub id: u64,
-    pub text: String,
+    #[serde(rename = "type")]
+    pub content_type: String, // "text" or "image"
+    pub text: Option<String>,
+    #[serde(rename = "imageData")]
+    pub image_data: Option<ImageData>,
     pub timestamp: u64,
     pub pinned: bool,
     pub last_copied: u64,
     pub copy_count: u64,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct ImageData {
+    pub width: u32,
+    pub height: u32,
+    pub hash: String,
+    #[serde(rename = "filePath")]
+    pub file_path: String, // Path to the stored image file
 }
 
 // Get the path to the clipboard history file

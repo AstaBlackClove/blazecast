@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { ClipboardItem } from "../../hooks/useClipboard";
 import { invoke } from "@tauri-apps/api/tauri";
+import { ClipboardImage } from "./clipBoardimg";
 
 interface ClipboardHistoryProps {
   history: ClipboardItem[];
@@ -27,14 +28,28 @@ export const ClipboardHistory: React.FC<ClipboardHistoryProps> = ({
   const historyRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const appRef = useRef<HTMLDivElement>(null);
+  const maxPins = 3;
+  const canAddPin = pinnedItems.length < maxPins;
 
   const pinItem = async (id: number) => {
     try {
+      console.log("Pinning item with ID:", id);
+      const itemToBePinned = history.find((item) => item.id === id);
+      console.log("Item to be pinned:", itemToBePinned);
+
       await invoke("pin_clipboard_item", { itemId: id });
+      console.log("Pin operation completed");
       onPinSuccess();
     } catch (error) {
       console.error("❌ Failed to pin item:", error);
     }
+  };
+
+  // Validate if the item can be pinned
+  const canPinItem = (itemId: number) => {
+    const item = history.find((item) => item.id === itemId);
+    if (!item) return false;
+    return item.pinned || canAddPin;
   };
 
   // Format timestamp to display in a readable format
@@ -108,12 +123,8 @@ export const ClipboardHistory: React.FC<ClipboardHistoryProps> = ({
       if (e.shiftKey && e.key.toLowerCase() === "p" && selectedIndex >= 0) {
         e.preventDefault();
         const selectedItem = history[selectedIndex];
-        if (selectedItem) {
-          if (selectedItem.pinned) {
-            pinItem(selectedItem.id);
-          } else if (pinnedItems.length < 3) {
-            pinItem(selectedItem.id);
-          }
+        if (selectedItem && canPinItem(selectedItem.id)) {
+          pinItem(selectedItem.id);
         }
       }
 
@@ -144,7 +155,19 @@ export const ClipboardHistory: React.FC<ClipboardHistoryProps> = ({
           e.preventDefault();
           const pinnedIndex = numKey - 1;
           if (pinnedIndex < pinnedItems.length) {
-            onCopy(pinnedItems[pinnedIndex].text);
+            const pinnedItem = pinnedItems[pinnedIndex];
+            if (pinnedItem.type === "text" && pinnedItem.text) {
+              onCopy(pinnedItem.text);
+            } else if (
+              pinnedItem.type === "image" &&
+              pinnedItem.imageData?.filePath
+            ) {
+              invoke("set_clipboard_image", {
+                filePath: pinnedItem.imageData.filePath,
+              }).catch((error) => {
+                console.error("Failed to copy image to clipboard:", error);
+              });
+            }
           }
         }
       }
@@ -154,7 +177,15 @@ export const ClipboardHistory: React.FC<ClipboardHistoryProps> = ({
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [pinnedItems, selectedIndex, history, onCopy, onDelete, onClear]);
+  }, [
+    pinnedItems,
+    selectedIndex,
+    history,
+    onCopy,
+    onDelete,
+    onClear,
+    canAddPin,
+  ]);
 
   // Focus the menu when it opens
   useEffect(() => {
@@ -179,20 +210,29 @@ export const ClipboardHistory: React.FC<ClipboardHistoryProps> = ({
     if (!selectedItem) return;
 
     switch (index) {
-      case 0:
-        onCopy(selectedItem.text);
+      case 0: // Copy
+        if (selectedItem.type === "text" && selectedItem.text) {
+          onCopy(selectedItem.text);
+        } else if (
+          selectedItem.type === "image" &&
+          selectedItem.imageData?.filePath
+        ) {
+          invoke("set_clipboard_image", {
+            filePath: selectedItem.imageData.filePath,
+          }).catch((error) => {
+            console.error("Failed to copy image to clipboard:", error);
+          });
+        }
         break;
-      case 1:
+      case 1: // Delete
         onDelete(selectedItem.id);
         break;
-      case 2:
-        if (selectedItem.pinned) {
-          pinItem(selectedItem.id);
-        } else {
+      case 2: // Pin/Unpin
+        if (canPinItem(selectedItem.id)) {
           pinItem(selectedItem.id);
         }
         break;
-      case 3:
+      case 3: // Clear All
         onClear();
         break;
     }
@@ -209,7 +249,19 @@ export const ClipboardHistory: React.FC<ClipboardHistoryProps> = ({
     if (e.key === "Enter") {
       e.preventDefault();
       if (selectedIndex >= 0 && selectedIndex < history.length) {
-        onCopy(history[selectedIndex].text);
+        const selectedItem = history[selectedIndex];
+        if (selectedItem.type === "text" && selectedItem.text) {
+          onCopy(selectedItem.text);
+        } else if (
+          selectedItem.type === "image" &&
+          selectedItem.imageData?.filePath
+        ) {
+          invoke("set_clipboard_image", {
+            filePath: selectedItem.imageData.filePath,
+          }).catch((error) => {
+            console.error("Failed to copy image to clipboard:", error);
+          });
+        }
       }
     } else if (e.key === "Delete") {
       e.preventDefault();
@@ -231,6 +283,26 @@ export const ClipboardHistory: React.FC<ClipboardHistoryProps> = ({
       ? history[selectedIndex]
       : null;
 
+  // Function to render item content preview in history list
+  const renderItemPreview = (item: ClipboardItem) => {
+    if (item.type === "text" && item.text) {
+      return (
+        <div className="mt-1 overflow-hidden overflow-ellipsis whitespace-nowrap">
+          {item.text.length > 100
+            ? `${item.text.substring(0, 100)}...`
+            : item.text}
+        </div>
+      );
+    } else if (item.type === "image" && item.imageData) {
+      return (
+        <div className="mt-1 text-xs text-gray-400">
+          [Image {item.imageData.width}x{item.imageData.height}]
+        </div>
+      );
+    }
+    return <div className="mt-1 text-xs text-gray-400">[Unknown content]</div>;
+  };
+
   return (
     <div
       ref={appRef}
@@ -238,19 +310,33 @@ export const ClipboardHistory: React.FC<ClipboardHistoryProps> = ({
     >
       <div className="flex flex-grow overflow-hidden h-full">
         <div className="w-1/3 border-r border-gray-700 bg-gray-800 flex flex-col h-full">
-          {/* //pinned section */}
+          {/* Pinned section */}
           {pinnedItems.length > 0 && (
             <>
               <div className="text-xs font-bold text-gray-400 px-3 py-2 bg-gray-700">
-                📌 Pinned
+                📌 Pinned ({pinnedItems.length}/{maxPins})
               </div>
               {pinnedItems.map((item, index) => (
                 <div
                   id={`clipboard-item-pinned-${index}`}
-                  key={item.id}
+                  key={`pinned-${item.id}`}
                   className="p-3 border-b border-gray-700 hover:bg-gray-800 flex justify-between"
-                  onClick={() => handleItemClick(index)}
-                  onContextMenu={(e) => openActionMenu(index, e)}
+                  onClick={() => {
+                    const itemIndex = history.findIndex(
+                      (h) => h.id === item.id
+                    );
+                    if (itemIndex !== -1) {
+                      handleItemClick(itemIndex);
+                    }
+                  }}
+                  onContextMenu={(e) => {
+                    const itemIndex = history.findIndex(
+                      (h) => h.id === item.id
+                    );
+                    if (itemIndex !== -1) {
+                      openActionMenu(itemIndex, e);
+                    }
+                  }}
                 >
                   {/* Render pinned item with shortcut hint */}
                   <div className="flex flex-col w-full">
@@ -266,17 +352,13 @@ export const ClipboardHistory: React.FC<ClipboardHistoryProps> = ({
                         )}
                       </div>
                     </div>
-                    <div className="mt-1 overflow-hidden overflow-ellipsis whitespace-nowrap">
-                      {item.text.length > 100
-                        ? `${item.text.substring(0, 100)}...`
-                        : item.text}
-                    </div>
+                    {renderItemPreview(item)}
                   </div>
                 </div>
               ))}
             </>
           )}
-          {/* //history section */}
+          {/* History section */}
           <div
             ref={historyRef}
             className="flex-grow overflow-y-auto"
@@ -307,12 +389,18 @@ export const ClipboardHistory: React.FC<ClipboardHistoryProps> = ({
                         <span className="text-xs text-gray-400">
                           {formatTimestamp(item.timestamp)}
                         </span>
+                        <div className="flex items-center">
+                          {item.pinned && (
+                            <span className="text-xs text-yellow-400 mr-2">
+                              📌
+                            </span>
+                          )}
+                          {item.type === "image" && (
+                            <span className="text-xs text-blue-400">Image</span>
+                          )}
+                        </div>
                       </div>
-                      <div className="mt-1 overflow-hidden overflow-ellipsis whitespace-nowrap">
-                        {item.text.length > 100
-                          ? `${item.text.substring(0, 100)}...`
-                          : item.text}
-                      </div>
+                      {renderItemPreview(item)}
                     </div>
                   </div>
                 ))}
@@ -320,21 +408,34 @@ export const ClipboardHistory: React.FC<ClipboardHistoryProps> = ({
             )}
           </div>
         </div>
-        {/* //selectd item section */}
+        {/* Selected item section */}
         <div className="flex-grow p-3 border-l border-gray-700 bg-gray-800 overflow-y-auto">
           {selectedItem ? (
             <>
               <div className="border-gray-700 mb-2">
                 <h3 className="font-medium mb-2">Content</h3>
                 <div className="bg-gray-900 p-3 rounded overflow-y-auto max-h-52">
-                  <pre className="text-sm whitespace-pre-wrap break-words">
-                    {selectedItem.text}
-                  </pre>
+                  {selectedItem.type === "text" && selectedItem.text ? (
+                    <pre className="text-sm whitespace-pre-wrap break-words">
+                      {selectedItem.text}
+                    </pre>
+                  ) : selectedItem.type === "image" &&
+                    selectedItem.imageData ? (
+                    <ClipboardImage
+                      filePath={selectedItem.imageData.filePath}
+                    />
+                  ) : (
+                    <span className="text-gray-400">Unknown content type</span>
+                  )}
                 </div>
               </div>
 
               <div className="font-medium mb-2">Information</div>
               <div className="text-sm mb-4">
+                <div className="flex justify-between mb-1">
+                  <span className="text-gray-400">Type</span>
+                  <span>{selectedItem.type}</span>
+                </div>
                 <div className="flex justify-between mb-1">
                   <span className="text-gray-400">Times copied</span>
                   <span>{selectedItem.copy_count || 1}</span>
@@ -347,9 +448,13 @@ export const ClipboardHistory: React.FC<ClipboardHistoryProps> = ({
                     )}
                   </span>
                 </div>
-                <div className="flex justify-between">
+                <div className="flex justify-between mb-1">
                   <span className="text-gray-400">First copied</span>
                   <span>{formatDate(selectedItem.timestamp)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Pinned</span>
+                  <span>{selectedItem.pinned ? "Yes" : "No"}</span>
                 </div>
               </div>
             </>
@@ -360,7 +465,7 @@ export const ClipboardHistory: React.FC<ClipboardHistoryProps> = ({
           )}
         </div>
       </div>
-      {/* //footer */}
+      {/* Footer */}
       <div className="flex-shrink-0 bg-gray-700 border-t border-gray-800 px-4 py-2 text-xs text-gray-400">
         <div className="flex justify-between items-center">
           <div>Actions</div>
@@ -390,7 +495,7 @@ export const ClipboardHistory: React.FC<ClipboardHistoryProps> = ({
           </div>
         </div>
       </div>
-      {/* //menu popup */}
+      {/* Menu popup */}
       {showActionMenu && selectedIndex >= 0 && (
         <div
           ref={menuRef}
@@ -407,10 +512,16 @@ export const ClipboardHistory: React.FC<ClipboardHistoryProps> = ({
               }
             } else if (e.key === "ArrowDown") {
               e.preventDefault();
-              setMenuSelectedIndex((prev) => (prev + 1) % 4); // 4 menu items
+              const totalItems =
+                history[selectedIndex]?.pinned || canAddPin ? 4 : 3;
+              setMenuSelectedIndex((prev) => (prev + 1) % totalItems);
             } else if (e.key === "ArrowUp") {
               e.preventDefault();
-              setMenuSelectedIndex((prev) => (prev - 1 + 4) % 4); // wrap around
+              const totalItems =
+                history[selectedIndex]?.pinned || canAddPin ? 4 : 3;
+              setMenuSelectedIndex(
+                (prev) => (prev - 1 + totalItems) % totalItems
+              );
             } else if (e.key === "Enter") {
               e.preventDefault();
               handleMenuSelect(menuSelectedIndex);
@@ -423,7 +534,19 @@ export const ClipboardHistory: React.FC<ClipboardHistoryProps> = ({
                 menuSelectedIndex === 0 ? "bg-gray-700" : "hover:bg-gray-700"
               }`}
               onClick={() => {
-                onCopy(history[selectedIndex].text);
+                const selectedItem = history[selectedIndex];
+                if (selectedItem.type === "text" && selectedItem.text) {
+                  onCopy(selectedItem.text);
+                } else if (
+                  selectedItem.type === "image" &&
+                  selectedItem.imageData?.filePath
+                ) {
+                  invoke("set_clipboard_image", {
+                    filePath: selectedItem.imageData.filePath,
+                  }).catch((error) => {
+                    console.error("Failed to copy image to clipboard:", error);
+                  });
+                }
                 setShowActionMenu(false);
               }}
             >
@@ -452,34 +575,42 @@ export const ClipboardHistory: React.FC<ClipboardHistoryProps> = ({
                 SHIFT+D
               </span>
             </button>
-            <button
-              className={`w-full text-left px-3 py-1.5 rounded flex justify-between items-center ${
-                menuSelectedIndex === 2 ? "bg-gray-700" : "hover:bg-gray-700"
-              }`}
-              onClick={() => {
-                const selectedItem = history[selectedIndex];
-                if (selectedItem.pinned) {
-                  pinItem(selectedItem.id);
-                } else if (pinnedItems.length < 3) {
-                  pinItem(selectedItem.id);
-                }
-                setShowActionMenu(false);
-              }}
-            >
-              <div className="flex items-center">
-                <span className="mr-2">
-                  {history[selectedIndex]?.pinned ? "📌" : "📌"}
+
+            {/* Only show Pin/Unpin option if it's already pinned or we can add more pins */}
+            {(history[selectedIndex]?.pinned || canAddPin) && (
+              <button
+                className={`w-full text-left px-3 py-1.5 rounded flex justify-between items-center ${
+                  menuSelectedIndex === 2 ? "bg-gray-700" : "hover:bg-gray-700"
+                }`}
+                onClick={() => {
+                  const selectedItem = history[selectedIndex];
+                  if (canPinItem(selectedItem.id)) {
+                    pinItem(selectedItem.id);
+                  }
+                  setShowActionMenu(false);
+                }}
+              >
+                <div className="flex items-center">
+                  <span className="mr-2">
+                    {history[selectedIndex]?.pinned ? "📌" : "📌"}
+                  </span>
+                  <span>
+                    {history[selectedIndex]?.pinned ? "Unpin" : "Pin"}
+                  </span>
+                </div>
+                <span className="text-xs bg-gray-900 px-1.5 py-0.5 rounded text-gray-300">
+                  SHIFT+P
                 </span>
-                <span>{history[selectedIndex]?.pinned ? "Unpin" : "Pin"}</span>
-              </div>
-              <span className="text-xs bg-gray-900 px-1.5 py-0.5 rounded text-gray-300">
-                SHIFT+P
-              </span>
-            </button>
+              </button>
+            )}
+
             <div className="border-t border-gray-700">
               <button
                 className={`w-full text-left px-3 py-1.5 rounded flex justify-between items-center mt-1 ${
-                  menuSelectedIndex === 3 ? "bg-gray-700" : "hover:bg-gray-700"
+                  menuSelectedIndex ===
+                  (history[selectedIndex]?.pinned || canAddPin ? 3 : 2)
+                    ? "bg-gray-700"
+                    : "hover:bg-gray-700"
                 }`}
                 onClick={() => {
                   onClear();

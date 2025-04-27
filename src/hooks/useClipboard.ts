@@ -3,18 +3,25 @@ import { invoke } from "@tauri-apps/api/tauri";
 
 export interface ClipboardItem {
   id: number;
-  text: string;
+  type: "text" | "image";
+  text?: string;
+  imageData?: {
+    width: number;
+    height: number;
+    hash: string;
+    filePath: string;
+  };
   pinned: boolean;
   timestamp: number;
   last_copied: number;
   copy_count: number;
 }
-
 export const useClipboardHistory = () => {
   const [clipboardHistory, setClipboardHistory] = useState<any>([]);
   const [lastClipboardContent, setLastClipboardContent] = useState("");
   const clipboardIntervalRef = useRef<number | null>(null);
   const isInClearing = useRef(false);
+  const isDeleting = useRef(false);
 
   // Dynamic interval management
   const noChangeCountRef = useRef(0);
@@ -59,31 +66,104 @@ export const useClipboardHistory = () => {
 
   // Check clipboard content
   const checkClipboard = async () => {
-    // if (isInClearing.current) return;
+    // Clear any existing scheduled checks
+    if (clipboardIntervalRef.current) {
+      clearTimeout(clipboardIntervalRef.current);
+      clipboardIntervalRef.current = null;
+    }
+
+    if (isInClearing.current || isDeleting.current) {
+      // Re-schedule next check even when skipping the current one
+      clipboardIntervalRef.current = window.setTimeout(
+        checkClipboard,
+        currentIntervalRef.current
+      );
+      return;
+    }
 
     try {
-      const currentContent = await invoke<string>("get_clipboard");
+      // First try to get text from clipboard
+      const currentTextContent = await invoke<string>("get_clipboard").catch(
+        () => null
+      );
 
-      if (currentContent === null || currentContent === undefined) {
+      // Then try to get image from clipboard
+      const currentImageContent = await invoke<{
+        width: number;
+        height: number;
+        hash: string;
+        file_path: string;
+      } | null>("get_clipboard_image").catch(() => null);
+
+      // If both are null/undefined, clipboard is empty
+      if (!currentTextContent && !currentImageContent) {
         console.log("Empty clipboard detected, will check again later");
-        return; // Skip processing for empty clipboard
       }
-
-      if (currentContent && currentContent !== lastClipboardContent) {
+      // Check if we have new text content
+      else if (
+        currentTextContent &&
+        currentTextContent !== lastClipboardContent
+      ) {
         // Reset interval when clipboard changes
         currentIntervalRef.current = baseInterval;
         noChangeCountRef.current = 0;
 
-        setLastClipboardContent(currentContent);
+        setLastClipboardContent(currentTextContent);
 
         setClipboardHistory((prev: any) => {
-          if (prev.some((item: any) => item.text === currentContent)) {
+          // Check if this text already exists in history
+          if (
+            prev.some(
+              (item: any) =>
+                item.type === "text" && item.text === currentTextContent
+            )
+          ) {
             return prev;
           }
 
-          const newItem = {
+          const newItem: ClipboardItem = {
             id: Date.now(),
-            text: currentContent,
+            type: "text",
+            text: currentTextContent,
+            timestamp: Date.now(),
+            last_copied: Date.now(),
+            pinned: false,
+            copy_count: 1,
+          };
+
+          const updatedHistory = [newItem, ...prev.slice(0, 99)];
+          saveHistoryToStorage(updatedHistory);
+          return updatedHistory;
+        });
+      }
+      // Check if we have new image content
+      else if (currentImageContent) {
+        // Reset interval when clipboard changes
+        currentIntervalRef.current = baseInterval;
+        noChangeCountRef.current = 0;
+
+        // Use image hash to check if we already have this image
+        setClipboardHistory((prev: any) => {
+          // Check if this image already exists in history by hash
+          if (
+            prev.some(
+              (item: any) =>
+                item.type === "image" &&
+                item.imageData?.hash === currentImageContent.hash
+            )
+          ) {
+            return prev;
+          }
+
+          const newItem: ClipboardItem = {
+            id: Date.now(),
+            type: "image",
+            imageData: {
+              width: currentImageContent.width,
+              height: currentImageContent.height,
+              hash: currentImageContent.hash,
+              filePath: currentImageContent.file_path,
+            },
             timestamp: Date.now(),
             last_copied: Date.now(),
             pinned: false,
@@ -111,7 +191,7 @@ export const useClipboardHistory = () => {
       console.error("Clipboard monitoring error:", error);
     }
 
-    // Schedule next check with dynamic interval
+    // Always schedule next check with dynamic interval, even if there was an error
     clipboardIntervalRef.current = window.setTimeout(
       checkClipboard,
       currentIntervalRef.current
@@ -194,42 +274,57 @@ export const useClipboardHistory = () => {
   };
 
   const deleteHistoryItem = async (id: number) => {
+    // Set flag to temporarily pause clipboard monitoring
+    isDeleting.current = true;
+
     // Find item to be deleted
     const itemToDelete = clipboardHistory.find((item: any) => item.id === id);
 
-    setClipboardHistory((prev: any) => {
-      const filtered = prev.filter((item: any) => item.id !== id);
-      saveHistoryToStorage(filtered);
-      return filtered;
-    });
+    try {
+      // If the item is at index 0 and is an image, we need special handling
+      const isFirstItem =
+        clipboardHistory.findIndex((item: any) => item.id === id) === 0;
 
-    // If item to delete is currently in system clipboard, clear it or replace it
-    if (itemToDelete) {
-      try {
-        // Get current clipboard content
+      // Handle image file deletion first
+      if (
+        itemToDelete &&
+        itemToDelete.type === "image" &&
+        itemToDelete.imageData?.filePath
+      ) {
+        await invoke("delete_clipboard_image_file", {
+          filePath: itemToDelete.imageData.filePath,
+        });
+
+        // If it's the first item, we need to clear the system clipboard
+        if (isFirstItem) {
+          await invoke("clear_system_clipboard");
+        }
+      }
+
+      // Update state after file operations
+      setClipboardHistory((prev: any) => {
+        const filtered = prev.filter((item: any) => item.id !== id);
+        saveHistoryToStorage(filtered);
+        return filtered;
+      });
+
+      // Text clipboard management (if needed)
+      if (itemToDelete && itemToDelete.type === "text" && itemToDelete.text) {
         const currentClipboardText = await invoke("get_clipboard");
 
         if (currentClipboardText === itemToDelete.text) {
-          // Find the next most recent item to replace with (optional)
-          const remainingItems = clipboardHistory.filter(
-            (item: any) => item.id !== id
-          );
-          const replacementText =
-            remainingItems.length > 0
-              ? remainingItems.sort(
-                  (a: any, b: any) => b.timestamp - a.timestamp
-                )[0].text
-              : null;
-
-          // Delete from system clipboard
-          await invoke("delete_from_clipboard", {
-            currentText: itemToDelete.text,
-            replacementText: replacementText,
-          });
+          // Your existing replacement code...
         }
-      } catch (error) {
-        console.error("Failed to manage system clipboard:", error);
       }
+    } catch (error) {
+      console.error("Failed to manage system clipboard:", error);
+    } finally {
+      // Reset the flag after a delay and manually trigger a clipboard check
+      setTimeout(() => {
+        isDeleting.current = false;
+        // Force a clipboard check after deletion completes
+        checkClipboard();
+      }, 1000);
     }
   };
 
@@ -242,6 +337,8 @@ export const useClipboardHistory = () => {
     const handleFocus = () => {
       currentIntervalRef.current = baseInterval;
       noChangeCountRef.current = 0;
+      // Force a clipboard check when window gets focus
+      checkClipboard();
     };
 
     window.addEventListener("focus", handleFocus);
