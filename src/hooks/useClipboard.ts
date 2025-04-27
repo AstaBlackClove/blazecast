@@ -258,19 +258,51 @@ export const useClipboardHistory = () => {
 
   const clearHistory = async () => {
     isInClearing.current = true;
-    setClipboardHistory([]);
-    saveHistoryToStorage([]);
 
-    // Also clear system clipboard
     try {
-      await invoke("clear_system_clipboard");
-    } catch (error) {
-      console.error("Failed to clear system clipboard:", error);
-    }
+      // Filter out image items from the clipboard history
+      const imageItems = clipboardHistory.filter(
+        (item: ClipboardItem) =>
+          item.type === "image" && item.imageData?.filePath
+      );
 
-    setTimeout(() => {
-      isInClearing.current = false;
-    }, 2000);
+      // Only process image deletion if there are actually images
+      if (imageItems.length > 0) {
+        console.log(`Deleting ${imageItems.length} image files...`);
+
+        // Delete each image file
+        for (const item of imageItems) {
+          if (item.imageData?.filePath) {
+            try {
+              await invoke("delete_clipboard_image_file", {
+                filePath: item.imageData.filePath,
+              });
+            } catch (error) {
+              console.error(
+                `Failed to delete image file: ${item.imageData.filePath}`,
+                error
+              );
+            }
+          }
+        }
+      }
+
+      // Clear system clipboard
+      await invoke("clear_system_clipboard");
+
+      // Update state and storage
+      setClipboardHistory([]);
+      saveHistoryToStorage([]);
+    } catch (error) {
+      console.error("Error during history clearing:", error);
+    } finally {
+      // Reset the flag after a delay and restart clipboard monitoring
+      setTimeout(() => {
+        isInClearing.current = false;
+        // Force a clipboard check after clearing completes
+        checkClipboard();
+      }, 2000);
+    }
   };
 
   const deleteHistoryItem = async (id: number) => {
