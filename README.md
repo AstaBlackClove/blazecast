@@ -2,7 +2,7 @@
 
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Windows](https://img.shields.io/badge/OS-Windows-blue)]()
-[![Download](https://img.shields.io/badge/Blazecast-beta--v0.1.0--msi-blue)](https://github.com/AstaBlackClove/blazecast/releases/download/v0.1.0-beta/blazecast_v0.1.0-beta.msi)
+[![Download](https://img.shields.io/badge/Blazecast-beta--v0.2.0--msi-blue)](https://github.com/AstaBlackClove/blazecast/releases/download/v0.2.0-beta/blazecast_v0.2.0-beta.msi)
 
 <div align="center">
   <img src="src-tauri/icons/icon.ico" alt="BlazeCast Logo" width="200">
@@ -31,7 +31,7 @@
 
 > _Note: Installation instructions will be added once we're ready for beta!_
 
-1. Download the latest installer from [Beta](https://github.com/AstaBlackClove/blazecast/releases/download/v0.1.0-beta/blazecast_v0.1.0-beta.msi).
+1. Download the latest installer from [Beta](https://github.com/AstaBlackClove/blazecast/releases/download/v0.2.0-beta/blazecast_v0.2.0-beta.msi).
 2. Run the installer and follow the prompts.
 3. Use the default hotkey (`Alt + Space`) to open BlazeCast.
 
