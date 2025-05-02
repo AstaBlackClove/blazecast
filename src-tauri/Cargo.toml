@@ -1,12 +1,16 @@
 [package]
 name = "blazecast"
-version = "0.1.0"
-description = "A Windows launcher with app indexing"
-authors = ["you"]
+version = "0.2.0"
+description = "Blazecast – A blazing-fast Windows productivity launcher, inspired by Raycast. Built with Rust, React, and Tauri."
+authors = ["guna"]
 edition = "2021"
 
 [build-dependencies]
 tauri-build = { version = "1", features = [] }
+
+[profile.release]
+codegen-units = 1
+lto = true
 
 [dependencies]
 tauri = { version = "1", features = [ "global-shortcut-all", "shell-open", "system-tray", "global-shortcut", "window-hide", "window-show", "window-close", "window-set-focus", "clipboard-all"] }
